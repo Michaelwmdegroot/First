@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#111712" />
+  <title>UNDERGROUND // Prototype 0.2</title>
+  <style>
+:root{
+  --ink:#e7eadf;
+  --muted:#aeb5a6;
+  --panel:rgba(13,18,14,.83);
+  --panel2:rgba(22,28,22,.92);
+  --line:rgba(224,231,210,.18);
+  --accent:#d69b45;
+  --accent2:#9ec774;
+  --danger:#d84f3d;
+  --safe:#8cc56f;
+  --shadow:0 18px 55px rgba(0,0,0,.38);
+}
+*{box-sizing:border-box}
+html,body,#game-shell{width:100%;height:100%;margin:0;overflow:hidden;background:#0d120e;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button{font:inherit;color:inherit}
+#render-wrap{position:absolute;inset:0;background:#10170f}
+#render-wrap canvas{position:absolute;inset:0;width:100%!important;height:100%!important;image-rendering:pixelated;cursor:crosshair}
+#render-wrap:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 45%,transparent 58%,rgba(1,3,1,.10) 88%,rgba(0,0,0,.28) 100%),linear-gradient(rgba(255,255,255,.008) 50%,rgba(0,0,0,.008) 50%);background-size:auto,100% 4px;mix-blend-mode:multiply}
+.panel{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px)}
+.glass{border-radius:3px}
+.heavy{background:rgba(13,18,14,.95)}
+#top-hud{position:absolute;left:16px;right:16px;top:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;pointer-events:none;z-index:5}
+#top-hud>*{pointer-events:auto}
+#player-card{width:286px;min-height:118px;padding:10px;display:flex;gap:12px}
+.portrait{width:72px;height:94px;position:relative;overflow:hidden;background:linear-gradient(150deg,#334038,#151b17 65%);border:1px solid rgba(255,255,255,.15);flex:none}
+.portrait:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 60%,rgba(0,0,0,.5))}
+.portrait-head{position:absolute;width:35px;height:37px;left:19px;top:13px;background:#bd9d7a;clip-path:polygon(18% 0,82% 0,100% 33%,86% 100%,14% 100%,0 33%)}
+.portrait-head:after{content:"";position:absolute;left:-3px;right:-3px;top:-7px;height:18px;background:#30352e;clip-path:polygon(0 55%,18% 15%,75% 0,100% 48%,88% 72%,10% 75%)}
+.portrait-body{position:absolute;width:60px;height:55px;left:6px;bottom:-15px;background:#435444;clip-path:polygon(20% 0,80% 0,100% 100%,0 100%)}
+.player-meta{flex:1;min-width:0}
+.eyebrow{font-size:9px;letter-spacing:.19em;color:#b7bea9;font-weight:800;text-transform:uppercase}
+.name-row{display:flex;align-items:center;justify-content:space-between;margin:2px 0 7px;font-size:13px;letter-spacing:.06em}
+.name-row span{color:var(--accent);font-size:10px}
+.meter-row{display:grid;grid-template-columns:38px 1fr 28px;gap:6px;align-items:center;margin:4px 0;font-size:8px;color:#c7ccbf;font-weight:800}
+.meter-row.small{grid-template-columns:38px 1fr}.meter-row.small b{display:none}
+.meter{height:7px;background:#242a23;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+.meter i{display:block;height:100%;width:100%;background:#b44a3a;box-shadow:inset 0 0 4px rgba(255,255,255,.2)}
+.meter-row.small:nth-of-type(4) .meter i{background:#b58a45}.meter-row.small:nth-of-type(5) .meter i{background:#6f9bb0}.meter-row.small:nth-of-type(6) .meter i{background:#78956c}
+#center-status{position:absolute;left:50%;transform:translateX(-50%);top:0;width:178px;text-align:center;padding:7px 12px 6px}
+#mode-label{font-size:11px;font-weight:900;letter-spacing:.14em}
+#clock-label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:var(--accent);margin-top:2px}
+.stealth{font-size:8px;font-weight:900;letter-spacing:.16em;margin-top:5px;padding-top:4px;border-top:1px solid var(--line)}
+.stealth.safe{color:var(--safe)}.stealth.hidden-state{color:#c3d99f}.stealth.exposed{color:#d9ae62}.stealth.alert{color:#f05f4c;animation:pulse .7s infinite alternate}
+@keyframes pulse{to{opacity:.5}}
+#objective-panel{width:300px;padding:12px 14px}
+#objective-title{font-weight:900;font-size:13px;text-transform:uppercase;margin:3px 0 8px;letter-spacing:.03em}
+.objective{display:flex;align-items:flex-start;gap:8px;color:#c9cec2;font-size:10px;margin-top:6px;line-height:1.35}.objective:before{content:"";width:7px;height:7px;border:1px solid #d49a43;margin-top:3px;flex:none}.objective.done{color:#7f8b7b;text-decoration:line-through}.objective.done:before{background:#86a869;border-color:#86a869}
+.side-panel{position:absolute;top:148px;left:16px;width:222px;padding:10px;z-index:5;max-height:calc(100vh - 308px);overflow:auto}
+.side-panel.right{left:auto;right:16px;width:260px}
+.panel-head{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:9px;font-weight:900;letter-spacing:.12em;color:#c8cec1;margin-bottom:8px}.panel-head b{font-size:8px;color:var(--accent)}
+.storage-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.stock{min-height:48px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035);padding:6px}.stock span{display:block;font-size:7px;color:#899284;text-transform:uppercase;letter-spacing:.08em}.stock b{display:block;font-size:15px;margin-top:4px}.stock.active b{color:var(--accent2)}
+.separator{height:1px;background:var(--line);margin:10px 0}
+.build-btn{width:100%;height:41px;margin:4px 0;border:1px solid rgba(255,255,255,.09);background:#1b231c;display:grid;grid-template-columns:1fr auto;grid-template-rows:1fr 1fr;text-align:left;padding:6px 8px;cursor:pointer}.build-btn span{font-size:9px;font-weight:900;letter-spacing:.08em}.build-btn b{font-size:10px;color:#cbd2c4}.build-btn small{grid-column:1/3;font-size:7px;color:#818a7f}.build-btn:hover,.build-btn.selected{border-color:#bd8a3d;background:#2a2a1d}.build-btn.accent span{color:#e0aa5d}.build-btn.locked{opacity:.4;pointer-events:none}
+.hint{font-size:8px;color:#8f988c;line-height:1.4;margin-top:8px}
+#npc-list{display:flex;flex-direction:column;gap:7px}.npc-card{border:1px solid rgba(255,255,255,.08);background:#171e18;padding:8px}.npc-name{display:flex;justify-content:space-between;font-size:11px;font-weight:900}.npc-role{font-size:8px;color:#d2a657;margin-top:2px;text-transform:uppercase}.npc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px}.npc-stat{background:#202820;padding:4px}.npc-stat span{display:block;font-size:6px;color:#899183}.npc-stat b{font-size:10px}.npc-traits{font-size:7px;color:#aab1a5;margin:7px 0}.npc-card button{width:100%;background:#2e382e;border:1px solid rgba(255,255,255,.12);font-size:8px;font-weight:900;padding:7px;cursor:pointer}.npc-card button:hover{border-color:#d4a04e}
+#bottom-hud{position:absolute;left:0;right:0;bottom:13px;display:flex;align-items:flex-end;justify-content:center;pointer-events:none;z-index:6}
+#action-bar{display:flex;padding:5px;gap:4px;pointer-events:auto;margin-left:254px}
+#action-bar button{width:94px;height:56px;background:rgba(24,31,24,.94);border:1px solid rgba(255,255,255,.08);display:grid;grid-template-columns:26px 1fr;grid-template-rows:22px 1fr;align-items:center;text-align:left;padding:6px;cursor:pointer}
+#action-bar button:hover{background:#2b352b;border-color:#788274}#action-bar button.active{border-color:#c89b57;background:#342f20}
+kbd{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.17);background:#0b0f0c;font-size:8px;font-family:inherit}.action-bar span,#action-bar span{font-size:9px;font-weight:900}.action-bar small,#action-bar small{grid-column:1/3;font-size:6px;color:#929a8e}
+#backpack{position:absolute;right:16px;bottom:0;width:270px;padding:9px;pointer-events:auto}
+.backpack-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.slot{height:49px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);position:relative;padding:5px;cursor:default}.slot.filled{background:#20281f}.slot .icon{font-size:15px}.slot .res-name{position:absolute;left:5px;bottom:5px;font-size:6px;color:#a7afa2;text-transform:uppercase}.slot .qty{position:absolute;right:5px;bottom:4px;font-size:10px;font-weight:900;color:#ebd3a4}.slot.usable{cursor:pointer;border-color:rgba(143,186,116,.35)}.backpack-note{font-size:7px;color:#788176;margin-top:6px}.backpack-note strong{color:#c49b61}
+.edge-btn{position:absolute;z-index:7;border:1px solid rgba(255,255,255,.12);background:rgba(11,16,12,.82);font-size:7px;font-weight:900;letter-spacing:.13em;padding:7px 10px;cursor:pointer}.right-edge{right:16px;top:118px}.edge-btn:hover{border-color:#b48b4e}
+#context-card{position:absolute;z-index:8;left:50%;bottom:92px;transform:translateX(-50%);width:270px;padding:10px;text-align:center}#context-title{font-size:10px;font-weight:900;letter-spacing:.12em}#context-copy{font-size:8px;color:#aeb5a9;margin:5px 0 8px}#context-action{border:1px solid #a67a3d;background:#302819;padding:7px 12px;font-weight:900;font-size:8px;cursor:pointer;width:100%}
+#crosshair-marker{position:absolute;width:18px;height:18px;border:1px solid rgba(255,255,255,.7);border-radius:50%;pointer-events:none;z-index:4;display:none;box-shadow:0 0 0 4px rgba(0,0,0,.3)}
+#toast-stack{position:absolute;left:50%;top:112px;transform:translateX(-50%);z-index:30;display:flex;flex-direction:column;gap:5px;align-items:center;pointer-events:none}.toast{background:rgba(12,17,13,.92);border:1px solid rgba(255,255,255,.12);padding:7px 12px;font-size:9px;font-weight:800;box-shadow:0 12px 30px rgba(0,0,0,.3);animation:toastIn .25s ease-out,toastOut .4s 2.35s forwards}@keyframes toastIn{from{transform:translateY(-8px);opacity:0}}@keyframes toastOut{to{transform:translateY(-8px);opacity:0}}
+.modal{position:absolute;inset:0;background:rgba(3,5,3,.72);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)}.hidden{display:none!important}.modal-card{position:relative;width:min(700px,calc(100vw - 40px));padding:24px}.modal-close{position:absolute;right:12px;top:10px;border:0;background:transparent;font-size:24px;color:#8f988c;cursor:pointer}.modal-card h1,.modal-card h2{margin:5px 0 12px;letter-spacing:.01em}.modal-card h1{font-size:28px}.modal-card h2{font-size:22px}.modal-card p{font-size:11px;color:#aab1a5;line-height:1.55}.build-tag{font-size:8px;letter-spacing:.2em;color:#d09a4b;font-weight:900}.intro-card{max-width:760px}.intro-loop{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:16px 0}.intro-loop div{border:1px solid rgba(255,255,255,.09);background:#171e18;padding:9px;min-height:108px}.intro-loop b{display:block;color:#d69b45;font-size:18px}.intro-loop span{display:block;font-size:10px;font-weight:900;margin:5px 0}.intro-loop small{font-size:8px;color:#8f988d;line-height:1.35}.controls-line{font-size:8px;color:#899187;margin:10px 0 14px}.controls-line span{color:#e0b56f;font-weight:900;margin-left:8px}.controls-line span:first-child{margin-left:0}.primary{width:100%;padding:12px;border:1px solid #c89345;background:#4d3c21;font-weight:900;font-size:10px;letter-spacing:.12em;cursor:pointer}.primary:hover{background:#5d4928}.primary.danger{border-color:#b64a3d;background:#4a211c}.danger-text{color:#e06958}.death-card{max-width:520px;text-align:center}
+.xp-line{display:flex;justify-content:space-between;font-size:9px;color:#aeb6a9}.xp-line b{color:#dfad61}.xp-meter{height:8px;background:#1e251e;border:1px solid rgba(255,255,255,.08);margin:8px 0 14px}.xp-meter i{display:block;height:100%;width:0;background:#bd8d47}.stats-grid{display:grid;gap:6px}.stat-row{display:grid;grid-template-columns:120px 1fr 90px;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.07);padding:8px;background:#171e18}.stat-row .stat-name b{display:block;font-size:10px}.stat-row .stat-name span{font-size:7px;color:#879084}.stat-pips{display:flex;gap:3px}.stat-pips i{height:8px;flex:1;background:#263026}.stat-pips i.on{background:#a77d3d}.stat-row button{border:1px solid rgba(255,255,255,.12);background:#273127;padding:7px;font-size:8px;font-weight:900;cursor:pointer}.stat-row button:disabled{opacity:.35}.modal-foot{margin-bottom:0!important;font-size:8px!important}
+#loading-screen{position:absolute;inset:0;z-index:200;background:#0b100c;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;transition:opacity .5s}.loading-mark{font-size:19px;font-weight:950;letter-spacing:.22em}.loading-screen span,#loading-screen span{font-size:8px;letter-spacing:.15em;color:#859081}.loading-bar{width:220px;height:3px;background:#1d281f;overflow:hidden}.loading-bar i{display:block;width:25%;height:100%;background:#b78846;animation:load 1.1s infinite ease-in-out}@keyframes load{0%{transform:translateX(-100%)}100%{transform:translateX(500%)}}
+@media(max-width:1100px){#player-card{width:250px}.side-panel{width:200px}#objective-panel{width:260px}#action-bar{margin-left:190px}#action-bar button{width:82px}#backpack{width:240px}}
+@media(max-width:800px){#top-hud{left:8px;right:8px;top:8px}#player-card{width:210px;transform:scale(.86);transform-origin:top left}#objective-panel{width:220px;transform:scale(.86);transform-origin:top right}#center-status{transform:translateX(-50%) scale(.85);transform-origin:top center}.side-panel{top:120px;left:8px;transform:scale(.86);transform-origin:top left}.side-panel.right{right:8px;transform-origin:top right}.right-edge{display:none}#backpack{right:8px;transform:scale(.82);transform-origin:bottom right}#action-bar{margin-left:0;transform:scale(.8);transform-origin:bottom center}.intro-loop{grid-template-columns:repeat(2,1fr)}}
+
+.backpack-note button{display:block;width:100%;margin-top:6px;border:1px solid rgba(255,255,255,.09);background:#1d251e;color:#b8bfb2;padding:5px;font-size:7px;font-weight:900;cursor:pointer}.backpack-note button:hover{border-color:#b68a4b;color:#e1b36e}
+
+  </style>
+</head>
+<body>
+  <div id="game-shell">
+    <div id="render-wrap"></div>
+
+    <header id="top-hud">
+      <section id="player-card" class="panel glass">
+        <div class="portrait">
+          <div class="portrait-head"></div>
+          <div class="portrait-body"></div>
+        </div>
+        <div class="player-meta">
+          <div class="eyebrow">SURVIVOR</div>
+          <div class="name-row"><strong>UNKNOWN</strong><span id="level-label">LV 1</span></div>
+          <div class="meter-row"><span>HP</span><div class="meter"><i id="hp-bar"></i></div><b id="hp-text">100</b></div>
+          <div class="meter-row small"><span>FOOD</span><div class="meter"><i id="hunger-bar"></i></div></div>
+          <div class="meter-row small"><span>WATER</span><div class="meter"><i id="thirst-bar"></i></div></div>
+          <div class="meter-row small"><span>REST</span><div class="meter"><i id="fatigue-bar"></i></div></div>
+        </div>
+      </section>
+
+      <section id="center-status" class="panel glass slim">
+        <div id="mode-label">BUNKER</div>
+        <div id="clock-label">DAY 01 // 06:20</div>
+        <div id="stealth-label" class="stealth safe">SAFE</div>
+      </section>
+
+      <section id="objective-panel" class="panel glass">
+        <div class="eyebrow">PRIMARY OBJECTIVE</div>
+        <div id="objective-title">Build a future underground.</div>
+        <div id="objective-list"></div>
+      </section>
+    </header>
+
+    <aside id="base-panel" class="panel glass side-panel">
+      <div class="panel-head"><span>BASE STORAGE</span><b id="base-room-count">0 ROOMS</b></div>
+      <div id="storage-grid" class="storage-grid"></div>
+      <div class="separator"></div>
+      <div class="panel-head"><span>CONSTRUCTION</span><b>GRID</b></div>
+      <button class="build-btn" data-room="shell-2x4"><span>ROOM SHELL</span><b>2×4</b><small>8 wood</small></button>
+      <button class="build-btn" data-room="shell-4x4"><span>ROOM SHELL</span><b>4×4</b><small>16 wood</small></button>
+      <button class="build-btn" data-room="shell-4x8"><span>ROOM SHELL</span><b>4×8</b><small>32 wood</small></button>
+      <button class="build-btn accent" data-room="workshop"><span>WORKSHOP</span><b>4×4</b><small>16 wood + 4 scrap</small></button>
+      <div id="build-hint" class="hint">Click dirt beside an open tile to excavate. Every block becomes 1 dirt.</div>
+    </aside>
+
+    <aside id="npc-panel" class="panel glass side-panel right hidden">
+      <div class="panel-head"><span>SURVIVORS</span><b id="npc-count">0</b></div>
+      <div id="npc-list"></div>
+    </aside>
+
+    <div id="context-card" class="panel glass hidden">
+      <div id="context-title">OBJECT</div>
+      <div id="context-copy"></div>
+      <button id="context-action">INTERACT</button>
+    </div>
+
+    <section id="bottom-hud">
+      <div id="action-bar" class="panel glass">
+        <button id="action-knife"><kbd>Q</kbd><span>KNIFE</span><small>Silent from behind</small></button>
+        <button id="action-crouch"><kbd>C</kbd><span>CROUCH</span><small>Reduce visibility</small></button>
+        <button id="action-interact"><kbd>E</kbd><span>INTERACT</span><small>Context action</small></button>
+        <button id="action-stats"><kbd>TAB</kbd><span>STATS</span><small id="points-label">0 points</small></button>
+      </div>
+
+      <div id="backpack" class="panel glass">
+        <div class="panel-head"><span>BACKPACK</span><b><span id="slot-used">0</span>/<span id="slot-total">8</span> SLOTS</b></div>
+        <div id="backpack-grid" class="backpack-grid"></div>
+        <div class="backpack-note">Stacks up to <strong>99</strong>. Knife is equipped and does not use a slot.</div>
+      </div>
+    </section>
+
+    <button id="toggle-survivors" class="edge-btn right-edge">SURVIVORS</button>
+
+    <div id="crosshair-marker"></div>
+    <div id="toast-stack"></div>
+
+    <div id="stats-modal" class="modal hidden">
+      <div class="modal-card panel glass heavy">
+        <button class="modal-close" data-close="stats-modal">×</button>
+        <div class="eyebrow">PLAYER PROGRESSION</div>
+        <h2>Survivor Stats</h2>
+        <div class="xp-line"><span>LEVEL <b id="stats-level">1</b></span><span>XP <b id="xp-label">0 / 120</b></span><span>POINTS <b id="statpoints-label">0</b></span></div>
+        <div id="xp-meter" class="xp-meter"><i></i></div>
+        <div id="stats-grid" class="stats-grid"></div>
+        <p class="modal-foot">Player stats are manually upgraded. Rescued NPCs level automatically while working.</p>
+      </div>
+    </div>
+
+    <div id="intro-modal" class="modal">
+      <div class="modal-card panel glass heavy intro-card">
+        <div class="build-tag">PLAYABLE CONCEPT // V0.2</div>
+        <h1>EUROPE IS OCCUPIED.</h1>
+        <p>A militant cult known as <strong>The Order</strong> controls the roads, farms and towns. Civilians are forced into labour camps. Disobedience is punished by death.</p>
+        <p>You found an old emergency shelter buried beneath the countryside. It is cramped, but hidden and safe. A cot, two days of food and a little drinking water are all that remain. If you want a future here, you will have to leave safety, scavenge the occupied world, and dig outward through the earth.</p>
+        <div class="intro-loop">
+          <div><b>1</b><span>DIG</span><small>Every excavated grid block becomes 1 dirt in your backpack.</small></div>
+          <div><b>2</b><span>GO UP</span><small>Dump dirt, sneak past patrols and gather wood/supplies.</small></div>
+          <div><b>3</b><span>RESCUE</span><small>Bring survivors underground and put their skills to work.</small></div>
+          <div><b>4</b><span>BUILD</span><small>Every room tile costs 1 wood, plus specialist materials.</small></div>
+        </div>
+        <div class="controls-line"><span>CLICK</span> move / interact <span>Q</span> knife <span>C</span> crouch <span>E</span> context <span>TAB</span> stats <span>WHEEL</span> zoom</div>
+        <button id="start-game" class="primary">ENTER THE BUNKER</button>
+      </div>
+    </div>
+
+    <div id="death-modal" class="modal hidden">
+      <div class="modal-card panel glass heavy death-card">
+        <div class="eyebrow danger-text">SURVIVOR LOST</div>
+        <h1>THE LINE ENDS HERE.</h1>
+        <p>In the full game, another family member or eligible survivor can inherit the run. Without a successor, the bloodline is lost.</p>
+        <button id="reload-game" class="primary danger">RELOAD BUNKER CHECKPOINT</button>
+      </div>
+    </div>
+
+    <div id="loading-screen">
+      <div class="loading-mark">UNDERGROUND</div>
+      <div class="loading-bar"><i></i></div>
+      <span>Carving the world…</span>
+    </div>
+  </div>
+
+  <script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
+
+const BUILD = '0.2.0';
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const keyOf = (x, z) => `${x},${z}`;
+const dist2D = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const ui = {
+  renderWrap: $('render-wrap'), level: $('level-label'), hpBar: $('hp-bar'), hpText: $('hp-text'), hungerBar: $('hunger-bar'), thirstBar: $('thirst-bar'), fatigueBar: $('fatigue-bar'),
+  mode: $('mode-label'), clock: $('clock-label'), stealth: $('stealth-label'), objectives: $('objective-list'), basePanel: $('base-panel'), storage: $('storage-grid'), roomCount: $('base-room-count'),
+  buildHint: $('build-hint'), backpack: $('backpack-grid'), used: $('slot-used'), points: $('points-label'), npcPanel: $('npc-panel'), npcList: $('npc-list'), npcCount: $('npc-count'),
+  context: $('context-card'), contextTitle: $('context-title'), contextCopy: $('context-copy'), contextAction: $('context-action'), statsModal: $('stats-modal'), statsGrid: $('stats-grid'),
+  statsLevel: $('stats-level'), xpLabel: $('xp-label'), statPoints: $('statpoints-label'), xpMeter: $('xp-meter').querySelector('i'), toast: $('toast-stack'), intro: $('intro-modal'), loading: $('loading-screen'), death: $('death-modal'),
+  btnKnife: $('action-knife'), btnCrouch: $('action-crouch'), btnInteract: $('action-interact'), btnStats: $('action-stats'), toggleSurvivors: $('toggle-survivors')
+};
+
+const RES = {
+  dirt: { label: 'Dirt', icon: '▦' }, wood: { label: 'Wood', icon: '▥' }, scrap: { label: 'Scrap', icon: '⚙' }, food: { label: 'Food', icon: '◆', usable: true },
+  water: { label: 'Water', icon: '◈', usable: true }, medicine: { label: 'Medicine', icon: '✚', usable: true }, cloth: { label: 'Cloth', icon: '▤' }, parts: { label: 'Parts', icon: '⬡' }
+};
+
+class Inventory {
+  constructor(size = 8) { this.size = size; this.slots = Array.from({ length: size }, () => null); }
+  count(type) { return this.slots.reduce((n, s) => n + (s?.type === type ? s.qty : 0), 0); }
+  used() { return this.slots.filter(Boolean).length; }
+  add(type, qty = 1) {
+    let left = qty;
+    for (const s of this.slots) {
+      if (s?.type === type && s.qty < 99) { const n = Math.min(99 - s.qty, left); s.qty += n; left -= n; if (!left) return qty; }
+    }
+    for (let i = 0; i < this.slots.length && left > 0; i++) {
+      if (!this.slots[i]) { const n = Math.min(99, left); this.slots[i] = { type, qty: n }; left -= n; }
+    }
+    return qty - left;
+  }
+  remove(type, qty = 1) {
+    let left = qty;
+    for (let i = this.slots.length - 1; i >= 0 && left > 0; i--) {
+      const s = this.slots[i]; if (!s || s.type !== type) continue;
+      const n = Math.min(s.qty, left); s.qty -= n; left -= n; if (s.qty <= 0) this.slots[i] = null;
+    }
+    return qty - left;
+  }
+  expand(n) { for (let i = 0; i < n; i++) this.slots.push(null); this.size += n; }
+}
+
+const state = {
+  started: false,
+  mode: 'bunker',
+  gameMinutes: 6 * 60 + 20,
+  day: 1,
+  player: {
+    hp: 100, hunger: 100, thirst: 100, fatigue: 100, level: 1, xp: 0, nextXp: 120, statPoints: 0,
+    stats: { health: 1, stamina: 1, strength: 1, intelligence: 1, social: 1 }, backpack: new Inventory(8), crouched: false, dead: false
+  },
+  base: { storage: { wood: 0, scrap: 0, food: 2, water: 2, medicine: 0, cloth: 0, parts: 0 }, rooms: [], roomCells: new Set(), workshopBuilt: false },
+  npc: {
+    name: 'Elise Varga', rescued: false, arrived: false, assigned: false, level: 1, xp: 0, nextXp: 24,
+    skills: { medical: 6, craft: 5, combat: 2, social: 4 }, traits: ['Steady hands', 'Distrusts The Order'], workTimer: 0, status: 'Missing'
+  },
+  progress: { dirtDumped: 0, woodGathered: 0, scrapGathered: 0, npcRescued: false, workshopBuilt: false, npcAssigned: false, backpackUpgraded: false },
+  selectedBuild: null,
+  buildRotation: 0
+};
+
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.22;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.BasicShadowMap;
+renderer.domElement.setAttribute('aria-label', 'Playable 3D game canvas');
+ui.renderWrap.appendChild(renderer.domElement);
+
+const camera = new THREE.OrthographicCamera(-10, 10, 7, -7, 0.1, 140);
+let cameraZoom = 1;
+const clock = new THREE.Clock();
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const losRaycaster = new THREE.Raycaster();
+
+function pixelTexture(base, fleck1, fleck2, size = 32) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'); g.fillStyle = base; g.fillRect(0, 0, size, size);
+  for (let i = 0; i < 150; i++) { g.fillStyle = Math.random() > .55 ? fleck1 : fleck2; const s = Math.random() > .8 ? 2 : 1; g.fillRect(Math.floor(Math.random() * size), Math.floor(Math.random() * size), s, s); }
+  const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+const texGrass = pixelTexture('#43583a', '#536a46', '#34482f'); texGrass.repeat.set(18, 18);
+const texDirt = pixelTexture('#5b4832', '#6b563b', '#443625'); texDirt.repeat.set(24, 24);
+const texRoad = pixelTexture('#6d685c', '#7a7569', '#565348'); texRoad.repeat.set(8, 20);
+const texBunker = pixelTexture('#3e3024', '#4a3929', '#2c241d'); texBunker.repeat.set(15, 12);
+
+function mat(color, rough = 1, metal = 0) { return new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, flatShading: true }); }
+function box(w, h, d, material, x = 0, y = h / 2, z = 0) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; return m; }
+function cyl(rt, rb, h, seg, material, x = 0, y = h / 2, z = 0) { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), material); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; return m; }
+function addLights(scene, outdoor = false) {
+  scene.add(new THREE.HemisphereLight(outdoor ? 0xc6d8b6 : 0xc2b18e, outdoor ? 0x28301f : 0x463424, outdoor ? 1.45 : 1.85));
+  const sun = new THREE.DirectionalLight(outdoor ? 0xffe2b4 : 0xf2d4a7, outdoor ? 2.2 : 2.05); sun.position.set(-15, 28, 11); sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -35; sun.shadow.camera.right = 35; sun.shadow.camera.top = 35; sun.shadow.camera.bottom = -35; scene.add(sun);
+}
+
+const bunkerScene = new THREE.Scene(); bunkerScene.background = new THREE.Color(0x2a2219); bunkerScene.fog = new THREE.Fog(0x2a2219, 18, 38); addLights(bunkerScene, false);
+bunkerScene.add(new THREE.AmbientLight(0xb89e76, 0.72));
+const surfaceScene = new THREE.Scene(); surfaceScene.background = new THREE.Color(0x7f9276); surfaceScene.fog = new THREE.Fog(0x61705b, 24, 55); addLights(surfaceScene, true);
+
+function makePerson({ coat = 0x4d6550, pants = 0x343a32, skin = 0xc49d77, hat = 0x353b34, cult = false } = {}) {
+  const g = new THREE.Group();
+  const torso = box(.48, .72, .28, mat(coat), 0, .96, 0); g.add(torso);
+  const head = box(.32, .34, .30, mat(skin), 0, 1.48, 0); g.add(head);
+  const hair = box(.34, .12, .32, mat(hat), 0, 1.69, -.01); g.add(hair);
+  const legMat = mat(pants); const l1 = box(.18, .58, .18, legMat, -.13, .36, 0); const l2 = box(.18, .58, .18, legMat, .13, .36, 0); g.add(l1, l2);
+  const armMat = mat(coat); const a1 = box(.14, .58, .16, armMat, -.32, .96, 0); const a2 = box(.14, .58, .16, armMat, .32, .96, 0); g.add(a1, a2);
+  if (cult) {
+    const mask = box(.34, .18, .33, mat(0x2a211f), 0, 1.45, .04); g.add(mask);
+    const stripe = box(.5, .09, .29, mat(0x8d2f2b), 0, 1.1, .02); g.add(stripe);
+    const rifle = box(.10, .10, .72, mat(0x2a2723, .65, .3), .35, .91, .18); rifle.rotation.x = .22; g.add(rifle);
+  } else {
+    const pack = box(.42, .55, .18, mat(0x3c3325), 0, .94, -.22); g.add(pack);
+  }
+  g.userData.parts = { l1, l2, a1, a2, torso }; return g;
+}
+const bunkerPlayer = makePerson({ coat: 0x4c6752 }); bunkerPlayer.scale.setScalar(.92); bunkerScene.add(bunkerPlayer);
+const surfacePlayer = makePerson({ coat: 0x4c6752 }); surfacePlayer.scale.setScalar(.92); surfaceScene.add(surfacePlayer);
+
+// ---------------- BUNKER ----------------
+const BW = 18, BD = 14, TILE = 1.2;
+const bunkerOriginX = -BW * TILE / 2;
+const bunkerOriginZ = -BD * TILE / 2;
+const earthMeshes = new Map();
+const floorMeshes = new Map();
+const bunkerDug = new Set();
+const bunkerInteractive = [];
+let bunkerPath = [];
+let pendingBunkerAction = null;
+let bunkerMoving = false;
+const startCells = [];
+for (let x = 8; x <= 9; x++) for (let z = 6; z <= 8; z++) startCells.push([x, z]);
+function gridWorld(gx, gz) { return new THREE.Vector3(bunkerOriginX + (gx + .5) * TILE, 0, bunkerOriginZ + (gz + .5) * TILE); }
+function worldGrid(p) { return { x: clamp(Math.floor((p.x - bunkerOriginX) / TILE), 0, BW - 1), z: clamp(Math.floor((p.z - bunkerOriginZ) / TILE), 0, BD - 1) }; }
+
+const bunkerBase = new THREE.Mesh(new THREE.PlaneGeometry(BW * TILE + 2, BD * TILE + 2), new THREE.MeshStandardMaterial({ map: texBunker, roughness: 1, color: 0x8a7257 }));
+bunkerBase.rotation.x = -Math.PI / 2; bunkerBase.position.y = -.08; bunkerBase.receiveShadow = true; bunkerBase.userData.type = 'bunkerBase'; bunkerScene.add(bunkerBase);
+const earthMats = [mat(0x8a6744), mat(0x96714b), mat(0x79583c), mat(0x9a744d)];
+function addOpenFloor(gx, gz, shelter = false) {
+  const p = gridWorld(gx, gz);
+  const floorMat = shelter ? mat(0x696a63, .92, .06) : mat(0x604a37);
+  const f = box(TILE * .96, .08, TILE * .96, floorMat, p.x, -.02, p.z);
+  f.userData = { type: 'bunkerFloor', gx, gz, shelter }; f.castShadow = false; f.receiveShadow = true; bunkerScene.add(f); floorMeshes.set(keyOf(gx, gz), f); bunkerInteractive.push(f); bunkerDug.add(keyOf(gx, gz)); return f;
+}
+for (let x = 0; x < BW; x++) for (let z = 0; z < BD; z++) {
+  const isStart = startCells.some(([sx, sz]) => sx === x && sz === z);
+  if (isStart) { addOpenFloor(x, z, true); continue; }
+  const p = gridWorld(x, z); const e = box(TILE * .97, 1.10 + rand(-.03, .06), TILE * .97, earthMats[(x * 7 + z * 3) % earthMats.length], p.x, .50, p.z);
+  e.userData = { type: 'earth', gx: x, gz: z }; bunkerScene.add(e); earthMeshes.set(keyOf(x, z), e); bunkerInteractive.push(e);
+}
+// The original shelter is usable space, but it is reserved: new rooms must be excavated outside it.
+for (const [x,z] of startCells) state.base.roomCells.add(keyOf(x,z));
+
+function addBunkerProps() {
+  const minX = gridWorld(8,7).x - TILE * .5;
+  const maxX = gridWorld(9,7).x + TILE * .5;
+  const minZ = gridWorld(8,6).z - TILE * .5;
+  const maxZ = gridWorld(8,8).z + TILE * .5;
+  const centerX = (minX + maxX) / 2;
+  const centerZ = (minZ + maxZ) / 2;
+  const roomW = maxX - minX;
+  const roomD = maxZ - minZ;
+  const concrete = mat(0x696a63, .95, .08);
+  const darkConcrete = mat(0x4f514d, .98, .05);
+
+  // Cutaway shelter shell: solid rear walls, low front retaining edges.
+  bunkerScene.add(box(roomW + .18, 1.20, .16, concrete, centerX, .60, minZ - .02));
+  bunkerScene.add(box(.16, 1.20, roomD + .18, concrete, minX - .02, .60, centerZ));
+  bunkerScene.add(box(roomW + .18, .26, .14, darkConcrete, centerX, .13, maxZ + .02));
+  bunkerScene.add(box(.14, .26, TILE * .82, darkConcrete, maxX + .02, .13, minZ + TILE * .45));
+  bunkerScene.add(box(.14, .26, TILE * .82, darkConcrete, maxX + .02, .13, maxZ - TILE * .45));
+  for (const [x,z] of [[minX,minZ],[maxX,minZ],[minX,maxZ]]) {
+    bunkerScene.add(box(.18, 1.52, .18, darkConcrete, x, .76, z));
+  }
+
+  // Floor hatch to the surface.
+  const start = gridWorld(8, 6);
+  const hatch = new THREE.Group();
+  const frame = box(.86, .13, .86, mat(0x60675f, .65, .38), 0, .065, 0); hatch.add(frame);
+  const lid = box(.72, .09, .72, mat(0x343a36, .5, .52), 0, .15, 0); lid.rotation.y = .08; hatch.add(lid);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.25, .035, 4, 12), mat(0x8a8d82, .45, .62)); ring.rotation.x = Math.PI / 2; ring.position.set(0, .23, .05); hatch.add(ring);
+  hatch.position.copy(start); hatch.userData = { type: 'bunkerHatch', gx: 8, gz: 6 }; bunkerScene.add(hatch); bunkerInteractive.push(hatch); window.bunkerHatch = hatch;
+
+  // Narrow military cot.
+  const cot = new THREE.Group();
+  cot.add(box(1.02, .13, .48, mat(0x4d4032), 0, .10, 0));
+  cot.add(box(.94, .10, .42, mat(0x7d8176), 0, .21, 0));
+  cot.add(box(.28, .08, .39, mat(0x9a9789), -.31, .27, 0));
+  cot.position.copy(gridWorld(9, 8)); cot.rotation.y = Math.PI / 2; bunkerScene.add(cot);
+
+  // Food crate with painted emergency band.
+  const food = new THREE.Group();
+  food.add(box(.56, .42, .52, mat(0x76603f), 0, .21, 0));
+  food.add(box(.58, .07, .54, mat(0xb3934e), 0, .33, 0));
+  food.position.copy(gridWorld(8,8)).add(new THREE.Vector3(-.16,0,-.06)); bunkerScene.add(food);
+
+  // Two blue-grey water cans.
+  const water = new THREE.Group();
+  for (let i=0;i<2;i++){
+    const can = box(.25,.46,.22,mat(0x4f6d72,.78,.18),i*.30-.15,.23,0);
+    water.add(can);
+    water.add(box(.12,.05,.10,mat(0x2f3d3f,.7,.25),i*.30-.15,.49,0));
+  }
+  water.position.copy(gridWorld(8,7)).add(new THREE.Vector3(-.22,0,.20)); bunkerScene.add(water);
+
+  // Old locker / tool cabinet.
+  const locker = new THREE.Group();
+  locker.add(box(.48,1.02,.36,mat(0x505952,.74,.28),0,.51,0));
+  locker.add(box(.05,.16,.04,mat(0x9a987f,.5,.5),.13,.58,.20));
+  locker.position.copy(gridWorld(9,6)).add(new THREE.Vector3(.20,0,.12)); bunkerScene.add(locker);
+
+  // Emergency wall lamp: visible emissive fixture + warm pool of light.
+  const lampPos = new THREE.Vector3(centerX, 1.18, minZ + .10);
+  const lampHousing = box(.64,.28,.13,mat(0x353936,.55,.42),lampPos.x,lampPos.y,lampPos.z);
+  bunkerScene.add(lampHousing);
+  const glowMat = new THREE.MeshStandardMaterial({color:0xffa24c, emissive:0xff6b2d, emissiveIntensity:3.6, roughness:.35});
+  const glow = box(.42,.13,.05,glowMat,lampPos.x,lampPos.y,lampPos.z+.085); bunkerScene.add(glow);
+  const lamp = new THREE.PointLight(0xff9a4a, 7.5, 9, 1.35); lamp.position.set(centerX,1.55,centerZ-.35); bunkerScene.add(lamp);
+  window.bunkerEmergencyLight = lamp;
+  window.bunkerEmergencyGlow = glow;
+
+  // Tiny table under the light, making the shelter feel inhabited but not developed.
+  const table = new THREE.Group();
+  table.add(box(.78,.10,.42,mat(0x5d4a35),0,.56,0));
+  table.add(box(.08,.52,.08,mat(0x463a2e),-.30,.27,-.14));
+  table.add(box(.08,.52,.08,mat(0x463a2e),.30,.27,-.14));
+  table.position.copy(gridWorld(9,7)).add(new THREE.Vector3(.18,0,-.24)); bunkerScene.add(table);
+}
+addBunkerProps();
+bunkerPlayer.position.copy(gridWorld(9, 7));
+
+function cellNeighbors(gx, gz) { return [[gx+1,gz],[gx-1,gz],[gx,gz+1],[gx,gz-1]].filter(([x,z]) => x>=0&&x<BW&&z>=0&&z<BD); }
+function findPath(start, goal) {
+  const sk = keyOf(start.x,start.z), gk = keyOf(goal.x,goal.z); if (!bunkerDug.has(gk)) return [];
+  const q = [[start.x,start.z]], came = new Map([[sk, null]]);
+  while (q.length) { const [x,z] = q.shift(); const k=keyOf(x,z); if(k===gk) break; for(const [nx,nz] of cellNeighbors(x,z)){const nk=keyOf(nx,nz); if(!bunkerDug.has(nk)||came.has(nk)) continue; came.set(nk,k); q.push([nx,nz]);} }
+  if (!came.has(gk)) return [];
+  const path=[]; let cur=gk; while(cur && cur!==sk){const [x,z]=cur.split(',').map(Number); path.unshift({x,z}); cur=came.get(cur);} return path;
+}
+function setBunkerPathTo(gx,gz, action=null) {
+  const s=worldGrid(bunkerPlayer.position); const path=findPath(s,{x:gx,z:gz}); if (!path.length && !(s.x===gx&&s.z===gz)) { toast('No open route. Dig a corridor first.'); return false; }
+  bunkerPath=path.map(c=>gridWorld(c.x,c.z)); pendingBunkerAction=action; return true;
+}
+function accessibleDigNeighbor(gx,gz){
+  const pg=worldGrid(bunkerPlayer.position); const candidates=cellNeighbors(gx,gz).filter(([x,z])=>bunkerDug.has(keyOf(x,z)));
+  candidates.sort((a,b)=>Math.abs(a[0]-pg.x)+Math.abs(a[1]-pg.z)-Math.abs(b[0]-pg.x)-Math.abs(b[1]-pg.z)); return candidates[0];
+}
+function requestDig(gx,gz){
+  if (!earthMeshes.has(keyOf(gx,gz))) return;
+  if (state.player.backpack.add('dirt',0) !== 0) {} // intentional no-op; keeps inventory API path warm
+  const canFit = state.player.backpack.count('dirt') < 99 || state.player.backpack.used() < state.player.backpack.size;
+  if (!canFit) { toast('Backpack full. Take dirt above ground and dump it.'); return; }
+  const n=accessibleDigNeighbor(gx,gz); if(!n){toast('You can only excavate dirt beside an open tile.');return;}
+  setBunkerPathTo(n[0],n[1],{type:'dig',gx,gz});
+}
+function digCell(gx,gz){
+  const k=keyOf(gx,gz), e=earthMeshes.get(k); if(!e) return;
+  const added=state.player.backpack.add('dirt',1); if(!added){toast('Backpack full.');return;}
+  bunkerScene.remove(e); earthMeshes.delete(k); addOpenFloor(gx,gz); particles(bunkerScene,gridWorld(gx,gz).add(new THREE.Vector3(0,.6,0)),0x8b6845,11,.9); addXP(4); toast('+1 dirt — it must be dumped above ground.'); updateUI();
+}
+
+const roomDefs={
+  'shell-2x4':{label:'Room Shell 2×4',w:2,h:4,wood:8,scrap:0,type:'shell'},
+  'shell-4x4':{label:'Room Shell 4×4',w:4,h:4,wood:16,scrap:0,type:'shell'},
+  'shell-4x8':{label:'Room Shell 4×8',w:4,h:8,wood:32,scrap:0,type:'shell'},
+  'workshop':{label:'Workshop',w:4,h:4,wood:16,scrap:4,type:'workshop'}
+};
+function selectBuild(id){ state.selectedBuild=state.selectedBuild===id?null:id; document.querySelectorAll('.build-btn').forEach(b=>b.classList.toggle('selected',b.dataset.room===state.selectedBuild)); const d=roomDefs[id]; ui.buildHint.textContent=state.selectedBuild?`Placement mode: ${d.label}. Click the top-left open grid tile. Every room grid tile costs 1 wood.`:'Click dirt beside an open tile to excavate. Every block becomes 1 dirt.'; }
+function tryPlaceRoom(gx,gz){
+  const d=roomDefs[state.selectedBuild]; if(!d) return;
+  if(gx+d.w>BW||gz+d.h>BD){toast('Room does not fit inside the bunker grid.');return;}
+  const cells=[]; for(let x=gx;x<gx+d.w;x++)for(let z=gz;z<gz+d.h;z++){const k=keyOf(x,z); if(!bunkerDug.has(k)){toast(`Needs ${d.w}×${d.h} completely excavated free space.`);return;} if(state.base.roomCells.has(k)){toast('Part of that area already belongs to another room.');return;} cells.push([x,z]);}
+  if(state.base.storage.wood<d.wood){toast(`Need ${d.wood} wood. Gather it above ground.`);return;} if(state.base.storage.scrap<d.scrap){toast(`Need ${d.scrap} scrap in base storage.`);return;}
+  state.base.storage.wood-=d.wood; state.base.storage.scrap-=d.scrap; cells.forEach(([x,z])=>state.base.roomCells.add(keyOf(x,z)));
+  const group=new THREE.Group();
+  for(const [x,z] of cells){const p=gridWorld(x,z); const f=box(TILE*.91,.10,TILE*.91,mat(d.type==='workshop'?0x4e5145:0x514737),p.x,.045,p.z); f.castShadow=false; group.add(f);}
+  const min=gridWorld(gx,gz), max=gridWorld(gx+d.w-1,gz+d.h-1); const cx=(min.x+max.x)/2, cz=(min.z+max.z)/2, ww=d.w*TILE, dd=d.h*TILE; const wm=mat(0x67533a);
+  group.add(box(ww,.34,.10,wm,cx,.17,min.z-TILE*.46)); group.add(box(ww,.34,.10,wm,cx,.17,max.z+TILE*.46)); group.add(box(.10,.34,dd,wm,min.x-TILE*.46,.17,cz)); group.add(box(.10,.34,dd,wm,max.x+TILE*.46,.17,cz));
+  if(d.type==='workshop'){
+    const bench=box(1.75,.62,.55,mat(0x5d4932),cx,.31,cz); group.add(bench); group.add(box(.72,.12,.38,mat(0x555b55,.5,.45),cx,.68,cz));
+    for(let i=-1;i<=1;i++){const tool=box(.08,.38,.08,mat(0x8b8c83,.45,.65),cx+i*.28,.87,cz); tool.rotation.z=i*.22; group.add(tool);}
+    state.base.workshopBuilt=true; state.progress.workshopBuilt=true; window.workshopCenter=new THREE.Vector3(cx,0,cz);
+  }
+  bunkerScene.add(group); state.base.rooms.push({id:state.selectedBuild,def:d,gx,gz,group,center:new THREE.Vector3(cx,0,cz)}); addXP(d.type==='workshop'?35:12); toast(`${d.label} built.`); selectBuild(state.selectedBuild); updateUI();
+}
+
+// ---------------- SURFACE ----------------
+const surfaceInteractives=[]; const losBlockers=[]; const obstacles=[]; const bushes=[]; const resourceNodes=[]; const enemies=[];
+let surfaceTarget=null, pendingSurfaceAction=null, surfaceMoving=false; let rescuedFollower=null;
+const groundMat=new THREE.MeshStandardMaterial({map:texGrass,color:0xa3b78a,roughness:1});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(76,76),groundMat); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; ground.userData.type='surfaceGround'; surfaceScene.add(ground); surfaceInteractives.push(ground);
+function addGroundPatch(x,z,w,d,color,y=.012){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),new THREE.MeshStandardMaterial({color,roughness:1}));m.rotation.x=-Math.PI/2;m.position.set(x,y,z);m.receiveShadow=true;m.userData.type='surfaceGround';surfaceScene.add(m);surfaceInteractives.push(m);return m;}
+const road=new THREE.Mesh(new THREE.PlaneGeometry(9,70),new THREE.MeshStandardMaterial({map:texRoad,color:0xb1a58d,roughness:1})); road.rotation.x=-Math.PI/2; road.rotation.z=.15; road.position.set(3,.018,0); road.receiveShadow=true; road.userData.type='surfaceGround'; surfaceScene.add(road); surfaceInteractives.push(road);
+const sidePath=new THREE.Mesh(new THREE.PlaneGeometry(34,5),new THREE.MeshStandardMaterial({map:texDirt,color:0xa58b65,roughness:1})); sidePath.rotation.x=-Math.PI/2; sidePath.rotation.z=-.32; sidePath.position.set(-10,.025,10); sidePath.userData.type='surfaceGround';surfaceScene.add(sidePath);surfaceInteractives.push(sidePath);
+for(let i=0;i<45;i++) addGroundPatch(rand(-34,34),rand(-34,34),rand(.5,2.1),rand(.4,1.5),Math.random()>.5?0x4d6241:0x394f35,.021);
+
+function addObstacleBox(x,z,w,d,h=1.2,color=0x64645a){const m=box(w,h,d,mat(color),x,h/2,z);surfaceScene.add(m);obstacles.push({x,z,w:w+.25,d:d+.25});losBlockers.push(m);return m;}
+function addStoneWall(x,z,len,rot=0){const g=new THREE.Group();const n=Math.ceil(len/.9);for(let i=0;i<n;i++){const b=box(.86,.55+rand(-.08,.12),.48,mat(i%2?0x727165:0x66665d),(i-(n-1)/2)*.84,.28,0);b.rotation.y=rand(-.04,.04);g.add(b);}g.position.set(x,0,z);g.rotation.y=rot;surfaceScene.add(g); const w=Math.abs(Math.cos(rot))*len+Math.abs(Math.sin(rot))*.6,d=Math.abs(Math.sin(rot))*len+Math.abs(Math.cos(rot))*.6;obstacles.push({x,z,w,d});losBlockers.push(g);return g;}
+function addTree(x,z,s=1){const g=new THREE.Group();const trunk=cyl(.18*s,.24*s,1.7*s,5,mat(0x554331),0,.85*s,0);g.add(trunk);const leafM=mat(0x2e4d2b);for(let i=0;i<3;i++){const geo=new THREE.DodecahedronGeometry((.72+rand(-.1,.12))*s,0);const l=new THREE.Mesh(geo,leafM);l.position.set(rand(-.25,.25)*s,(1.7+i*.38)*s,rand(-.22,.22)*s);l.castShadow=true;g.add(l);}g.position.set(x,0,z);surfaceScene.add(g);obstacles.push({x,z,w:.65*s,d:.65*s});losBlockers.push(trunk);return g;}
+function addBush(x,z,r=.9){const g=new THREE.Group();for(let i=0;i<4;i++){const geo=new THREE.DodecahedronGeometry(rand(.35,.55),0);const m=new THREE.Mesh(geo,mat(i%2?0x3d5b36:0x31502e));m.position.set(rand(-.35,.35),rand(.25,.45),rand(-.35,.35));m.castShadow=true;g.add(m);}g.position.set(x,0,z);surfaceScene.add(g);bushes.push({x,z,r,group:g});return g;}
+
+// European rural edges, hedges and checkpoint ruins
+addStoneWall(-22,-7,17,.02); addStoneWall(-16,-18,13,Math.PI/2); addStoneWall(20,12,13,Math.PI/2); addStoneWall(15,23,11,.04);
+for(const [x,z,s] of [[-29,25,1.1],[-25,12,.9],[-28,-1,1.2],[-24,-25,1.1],[-9,27,1],[18,28,1.15],[29,19,.95],[26,-2,1.2],[30,-17,1],[15,-28,1.15],[-2,-29,1],[-30,-28,1.1],[9,20,.8],[22,-22,.8]]) addTree(x,z,s);
+for(const [x,z] of [[-18,8],[-9,13],[-1,13],[8,10],[14,3],[-3,-9],[12,-15],[-11,-20],[22,18]]) addBush(x,z,1.1);
+// ruined farmhouse
+const house=new THREE.Group();house.add(box(7,2.6,5,mat(0x625e50),0,1.3,0));house.add(box(5.8,2.8,5.4,mat(0x4a3b31),0,3.15,0));house.children[1].geometry=new THREE.ConeGeometry(4.6,2.1,4);house.children[1].rotation.y=Math.PI/4;house.position.set(-25,0,-8);surfaceScene.add(house);obstacles.push({x:-25,z:-8,w:7,d:5});losBlockers.push(house);
+// checkpoint hut and tower
+const hut=addObstacleBox(8,8,4.2,3.2,2.5,0x5d5648); const roof=box(4.6,.25,3.6,mat(0x343a35),8,2.7,8);surfaceScene.add(roof);
+const tower=new THREE.Group();for(const sx of[-1,1])for(const sz of[-1,1])tower.add(box(.14,4.2,.14,mat(0x4d4a40),sx*.7,2.1,sz*.7));tower.add(box(1.8,.15,1.8,mat(0x625742),0,3.35,0));tower.add(box(1.7,1.2,1.7,mat(0x4a4d45),0,4,0));tower.position.set(15,0,12);surfaceScene.add(tower);losBlockers.push(tower);obstacles.push({x:15,z:12,w:1.8,d:1.8});
+// barrier, signs and wire-ish posts
+for(let z=-4;z<=4;z+=2){const p=box(.16,1.25,.16,mat(0x4a4338),2.7,.62,z);surfaceScene.add(p);} const barrier=box(7,.12,.15,mat(0xb9b09a),2.7,.85,0);barrier.rotation.y=.08;surfaceScene.add(barrier);
+for(let i=0;i<6;i++){const c=box(.55,.55,.55,mat(i%2?0x6b5b3e:0x786343),6+rand(-2,2),.28,12+rand(-1.5,1.5));surfaceScene.add(c);}
+
+// Hatch + spoil pile
+const surfaceHatch=new THREE.Group();surfaceHatch.add(box(1.25,.18,1.25,mat(0x3e4540,.6,.5),0,.09,0));surfaceHatch.add(box(1.0,.12,1.0,mat(0x292f2b,.45,.6),0,.19,0));surfaceHatch.position.set(-20,0,16);surfaceHatch.userData={type:'surfaceHatch'};surfaceScene.add(surfaceHatch);surfaceInteractives.push(surfaceHatch);
+const dirtDump=new THREE.Group();for(let i=0;i<9;i++){const b=box(rand(.55,1.1),rand(.25,.48),rand(.55,1.05),mat(i%2?0x684b30:0x745436),rand(-1.2,1.2),rand(.1,.32),rand(-.8,.8));b.rotation.y=rand(0,Math.PI);dirtDump.add(b);}dirtDump.position.set(-16.7,0,16);dirtDump.scale.set(.7,.55,.7);dirtDump.userData={type:'dirtDump'};surfaceScene.add(dirtDump);surfaceInteractives.push(dirtDump);
+
+function makeResourceNode(type,qty,x,z){
+  const g=new THREE.Group();
+  if(type==='wood'){for(let i=0;i<5;i++){const log=cyl(.16,.16,1.4,6,mat(0x65472e),0,.18,i*.18-.36);log.rotation.z=Math.PI/2;log.rotation.y=rand(-.08,.08);g.add(log);}}
+  else if(type==='scrap'){for(let i=0;i<5;i++){const s=box(rand(.35,.75),rand(.12,.3),rand(.3,.6),mat(i%2?0x535955:0x6c675c,.7,.45),rand(-.45,.45),rand(.08,.2),rand(-.4,.4));s.rotation.y=rand(0,Math.PI);g.add(s);}}
+  else { const crate=box(.82,.62,.72,mat(type==='food'?0x6c5b3b:type==='water'?0x4b6265:type==='medicine'?0x67665b:0x6b6252),0,.31,0);g.add(crate);const mark=box(.5,.08,.76,mat(type==='medicine'?0x9c4f43:0x8c7c58),0,.47,0);g.add(mark); }
+  g.position.set(x,0,z);g.userData={type:'resource',resource:type,qty,depleted:false};surfaceScene.add(g);surfaceInteractives.push(g);resourceNodes.push(g);return g;
+}
+[
+  ['wood',8,-14,9],['wood',7,-5,17],['wood',8,8,18],['wood',7,20,3],['wood',6,-6,-17],
+  ['scrap',5,5,12],['scrap',4,17,10],['scrap',6,8,-9],
+  ['food',3,-17,-11],['water',3,-10,24],['medicine',2,21,-19],['cloth',5,13,-18]
+].forEach(a=>makeResourceNode(...a));
+
+// Captive cage
+const cage=new THREE.Group();const cageMat=mat(0x53564f,.55,.55);for(const sx of[-1,1])for(const sz of[-1,1])cage.add(box(.08,1.9,.08,cageMat,sx*.85,.95,sz*.75));for(let x=-.8;x<=.8;x+=.32){cage.add(box(.055,1.75,.055,cageMat,x,.88,-.74));cage.add(box(.055,1.75,.055,cageMat,x,.88,.74));}for(let z=-.65;z<=.65;z+=.32){cage.add(box(.055,1.75,.055,cageMat,-.84,.88,z));cage.add(box(.055,1.75,.055,cageMat,.84,.88,z));}cage.add(box(1.9,.10,1.7,cageMat,0,1.82,0));cage.position.set(15,0,-13);cage.userData={type:'cage'};surfaceScene.add(cage);surfaceInteractives.push(cage);losBlockers.push(cage);
+const captive=makePerson({coat:0x6f654d,pants:0x49443a,hat:0x594f42});captive.scale.setScalar(.86);captive.position.set(15,0,-13);surfaceScene.add(captive);
+
+function makeVisionCone(radius=10,half=Math.PI/5.6){const shape=new THREE.Shape();shape.moveTo(0,0);for(let i=0;i<=20;i++){const a=-half+(2*half*i/20);shape.lineTo(Math.sin(a)*radius,Math.cos(a)*radius);}shape.lineTo(0,0);const geom=new THREE.ShapeGeometry(shape);const m=new THREE.Mesh(geom,new THREE.MeshBasicMaterial({color:0xb7d878,transparent:true,opacity:.14,depthWrite:false,side:THREE.DoubleSide}));m.rotation.x=Math.PI/2;m.position.y=.025;m.raycast=()=>{};return m;}
+function createEnemy(route,idx){
+  const g=makePerson({coat:0x343b35,pants:0x272c28,hat:0x272a27,cult:true});g.scale.setScalar(.96);g.position.copy(route[0]);g.userData={type:'enemy',enemyIndex:idx};
+  const cone=makeVisionCone(10,Math.PI/5.4);g.add(cone);const marker=box(.16,.16,.16,mat(0xd44234),0,2.05,0);marker.rotation.y=Math.PI/4;marker.visible=false;g.add(marker);
+  surfaceScene.add(g);surfaceInteractives.push(g);const e={group:g,route,index:1,speed:1.15+idx*.04,yaw:0,alert:false,suspicion:0,hp:100,alive:true,shootCd:0,cone,marker,deathT:0};enemies.push(e);return e;
+}
+const V=(x,z)=>new THREE.Vector3(x,0,z);
+createEnemy([V(-1,6),V(1,-1),V(-4,-8),V(-7,1)],0);
+createEnemy([V(10,10),V(17,10),V(18,2),V(9,2)],1);
+createEnemy([V(11,-9),V(19,-9),V(20,-17),V(10,-18)],2);
+createEnemy([V(-10,-4),V(-15,-10),V(-9,-15),V(-3,-8)],3);
+
+surfacePlayer.position.copy(surfaceHatch.position).add(new THREE.Vector3(0,0,-1.6));
+
+// ---------------- NPC / PROGRESSION ----------------
+const bunkerNpc=makePerson({coat:0x6a644d,pants:0x444239,hat:0x51493c});bunkerNpc.scale.setScalar(.86);bunkerNpc.visible=false;bunkerNpc.position.copy(gridWorld(8,7));bunkerScene.add(bunkerNpc);
+function rescueNpc(){
+  if(state.npc.rescued)return; state.npc.rescued=true;state.npc.status='Following you';state.progress.npcRescued=true;cage.userData.open=true;
+  captive.visible=false; rescuedFollower=makePerson({coat:0x6f654d,pants:0x49443a,hat:0x594f42});rescuedFollower.scale.setScalar(.86);rescuedFollower.position.copy(cage.position).add(new THREE.Vector3(0,0,1.4));surfaceScene.add(rescuedFollower);
+  particles(surfaceScene,cage.position.clone().add(new THREE.Vector3(0,1,0)),0xd6b36d,15,1.2);addXP(55);toast('Elise rescued. Get her back to the bunker.');updateUI();
+}
+function npcArrive(){if(!state.npc.rescued||state.npc.arrived)return;state.npc.arrived=true;state.npc.status='Unassigned';bunkerNpc.visible=true;if(rescuedFollower){surfaceScene.remove(rescuedFollower);rescuedFollower=null;}toast('Elise is safe underground.');updateUI();}
+function toggleAssignNpc(){if(!state.npc.arrived){toast('Elise has not reached the bunker.');return;}if(!state.base.workshopBuilt){toast('Build a workshop first.');return;}state.npc.assigned=!state.npc.assigned;state.progress.npcAssigned=state.npc.assigned;state.npc.status=state.npc.assigned?'Working: Workshop':'Unassigned';if(state.npc.assigned&&window.workshopCenter)bunkerNpc.position.copy(window.workshopCenter).add(new THREE.Vector3(0,0,.65));else bunkerNpc.position.copy(gridWorld(8,7));toast(state.npc.assigned?'Elise assigned to the workshop.':'Elise removed from the workshop.');updateUI();}
+function updateNpcWork(dt){if(!state.npc.assigned||!state.base.workshopBuilt)return;const productivity=1+(state.npc.level-1)*.12+state.npc.skills.craft*.025;state.npc.workTimer+=dt*productivity;if(state.npc.workTimer>=18){state.npc.workTimer=0;if(state.base.storage.scrap>=2){state.base.storage.scrap-=2;state.base.storage.parts+=1;state.npc.xp+=6;toast('Workshop: Elise crafted +1 part.');if(state.npc.xp>=state.npc.nextXp){state.npc.xp-=state.npc.nextXp;state.npc.level++;state.npc.nextXp=Math.round(state.npc.nextXp*1.38);state.npc.skills.craft++;toast(`Elise reached level ${state.npc.level}. Craft skill improved.`);}updateUI();}else state.npc.status='Workshop needs 2 scrap';}}
+
+function maxHP(){return 90+state.player.stats.health*10;}
+function addXP(amount){const bonus=1+(state.player.stats.intelligence-1)*.04;state.player.xp+=Math.round(amount*bonus);while(state.player.xp>=state.player.nextXp){state.player.xp-=state.player.nextXp;state.player.level++;state.player.statPoints+=2;state.player.nextXp=Math.round(state.player.nextXp*1.34);state.player.hp=Math.min(maxHP(),state.player.hp+20);toast(`LEVEL ${state.player.level} — +2 stat points.`);}updateUI();}
+const statDefs={
+  health:['HEALTH','+10 max HP per point'],stamina:['STAMINA','Faster movement and slower fatigue'],strength:['STRENGTH','More frontal knife damage'],intelligence:['INTELLIGENCE','Bonus XP and future tech'],social:['SOCIAL','NPC work bonus and future relationships']
+};
+function spendStat(key){if(state.player.statPoints<=0)return;state.player.statPoints--;state.player.stats[key]++;if(key==='health')state.player.hp+=10;toast(`${statDefs[key][0]} increased.`);updateUI();}
+
+// ---------------- MOVEMENT / INTERACTION ----------------
+function setSurfaceDestination(v,action=null){surfaceTarget=new THREE.Vector3(v.x,0,v.z);pendingSurfaceAction=action;}
+function collidesSurface(p){for(const o of obstacles){if(Math.abs(p.x-o.x)<o.w/2+.25&&Math.abs(p.z-o.z)<o.d/2+.25)return true;}return false;}
+function updatePersonWalk(model,moving,t){if(!model?.userData?.parts)return;const p=model.userData.parts;const swing=moving?Math.sin(t*10)*.48:0;p.l1.rotation.x=swing;p.l2.rotation.x=-swing;p.a1.rotation.x=-swing*.55;p.a2.rotation.x=swing*.55;}
+function updateSurfacePlayer(dt,t){
+  let moving=false;if(surfaceTarget){const d=surfaceTarget.clone().sub(surfacePlayer.position);d.y=0;const len=d.length();if(len>.12){d.normalize();const speed=(3.0+state.player.stats.stamina*.18)*(state.player.crouched?.57:1);const step=Math.min(len,speed*dt);const np=surfacePlayer.position.clone().addScaledVector(d,step);if(!collidesSurface(np)){surfacePlayer.position.copy(np);surfacePlayer.rotation.y=Math.atan2(d.x,d.z);moving=true;}else{surfaceTarget=null;toast('Path blocked. Choose another route.');}}else{surfaceTarget=null;if(pendingSurfaceAction){const a=pendingSurfaceAction;pendingSurfaceAction=null;performSurfaceAction(a);}}}
+  updatePersonWalk(surfacePlayer,moving,t);surfaceMoving=moving;
+  if(rescuedFollower){const off=new THREE.Vector3(-.75,0,-.65).applyAxisAngle(new THREE.Vector3(0,1,0),surfacePlayer.rotation.y);const target=surfacePlayer.position.clone().add(off);const d=target.sub(rescuedFollower.position);d.y=0;if(d.length()>.15){const dir=d.normalize();rescuedFollower.position.addScaledVector(dir,Math.min(2.6*dt,d.length()));rescuedFollower.rotation.y=Math.atan2(dir.x,dir.z);updatePersonWalk(rescuedFollower,true,t);}else updatePersonWalk(rescuedFollower,false,t);}
+}
+function updateBunkerPlayer(dt,t){let moving=false;if(bunkerPath.length){const target=bunkerPath[0];const d=target.clone().sub(bunkerPlayer.position);d.y=0;if(d.length()>.06){d.normalize();bunkerPlayer.position.addScaledVector(d,Math.min((2.5+state.player.stats.stamina*.08)*dt,target.clone().sub(bunkerPlayer.position).length()));bunkerPlayer.rotation.y=Math.atan2(d.x,d.z);moving=true;}else{bunkerPlayer.position.copy(target);bunkerPath.shift();}}else if(pendingBunkerAction){const a=pendingBunkerAction;pendingBunkerAction=null;if(a.type==='dig')digCell(a.gx,a.gz);else if(a.type==='hatch')enterSurface();}updatePersonWalk(bunkerPlayer,moving,t);bunkerMoving=moving;}
+
+function isBehind(enemy){const toP=surfacePlayer.position.clone().sub(enemy.group.position).setY(0).normalize();const f=new THREE.Vector3(Math.sin(enemy.group.rotation.y),0,Math.cos(enemy.group.rotation.y));return f.dot(toP)<-.28;}
+function knifeAttack(){
+  if(state.mode!=='surface'||state.player.dead)return;let target=null,best=1.65;for(const e of enemies){if(!e.alive)continue;const d=dist2D(surfacePlayer.position,e.group.position);if(d<best){best=d;target=e;}}
+  if(!target){toast('No enemy in knife range.');return;}const behind=isBehind(target);if(behind&&!target.alert){killEnemy(target,true);return;}target.hp-=50+state.player.stats.strength*8;alertEnemy(target,true);particles(surfaceScene,target.group.position.clone().add(new THREE.Vector3(0,1,0)),0x7a2422,8,.7);if(target.hp<=0)killEnemy(target,false);else toast('Frontal attack! The patrol is alerted.');
+}
+function killEnemy(e,silent){if(!e.alive)return;e.alive=false;e.alert=false;e.cone.visible=false;e.marker.visible=false;e.deathT=.001;addXP(silent?24:16);const got=state.player.backpack.add('cloth',1);if(got)toast(`${silent?'Silent takedown':'Enemy down'} — +1 cloth.`);else toast('Enemy down — backpack full, cloth left behind.');const stain=addGroundPatch(e.group.position.x,e.group.position.z,.9,.45,0x5f2724,.028);stain.rotation.z=rand(0,Math.PI);}
+function alertEnemy(e,spread=false){if(!e.alive)return;e.alert=true;e.suspicion=1;e.marker.visible=true;e.cone.material.color.set(0xd95342);e.cone.material.opacity=.19;if(spread){for(const other of enemies)if(other!==e&&other.alive&&dist2D(other.group.position,e.group.position)<9){other.alert=true;other.marker.visible=true;other.cone.material.color.set(0xd95342);}}}
+function playerInBush(){if(!state.player.crouched)return false;return bushes.some(b=>Math.hypot(surfacePlayer.position.x-b.x,surfacePlayer.position.z-b.z)<b.r);}
+function hasLOS(e){const origin=e.group.position.clone().add(new THREE.Vector3(0,1.25,0)),target=surfacePlayer.position.clone().add(new THREE.Vector3(0,.85,0));const d=target.clone().sub(origin),len=d.length();losRaycaster.set(origin,d.normalize());const hits=losRaycaster.intersectObjects(losBlockers,true);return !hits.length||hits[0].distance>len-.25;}
+function enemyShoot(e){e.shootCd=1.55+rand(0,.65);const origin=e.group.position.clone().add(new THREE.Vector3(0,1.1,0)),end=surfacePlayer.position.clone().add(new THREE.Vector3(rand(-.16,.16),.9,rand(-.16,.16)));const geom=new THREE.BufferGeometry().setFromPoints([origin,end]);const line=new THREE.Line(geom,new THREE.LineBasicMaterial({color:0xf0d29a,transparent:true,opacity:.9}));surfaceScene.add(line);setTimeout(()=>surfaceScene.remove(line),75);const hitChance=state.player.crouched?.58:.76;if(Math.random()<hitChance){damagePlayer(22+Math.floor(rand(0,7)));particles(surfaceScene,end,0x8c2b27,6,.45);} }
+function damagePlayer(n){state.player.hp=clamp(state.player.hp-n,0,maxHP());if(state.player.hp<=0)playerDeath();updateUI();}
+function playerDeath(){if(state.player.dead)return;state.player.dead=true;surfaceTarget=null;ui.death.classList.remove('hidden');}
+function updateEnemies(dt,t){
+  let maxSusp=0, anyAlert=false;
+  for(const e of enemies){
+    if(!e.alive){if(e.deathT>=0){e.deathT+=dt;e.group.rotation.z=lerp(e.group.rotation.z,-Math.PI*.5,clamp(dt*5,0,1));e.group.position.y=lerp(e.group.position.y,-.38,clamp(dt*2.5,0,1));}continue;}
+    const ep=e.group.position,pp=surfacePlayer.position,dist=dist2D(ep,pp);
+    if(e.alert){anyAlert=true;const d=pp.clone().sub(ep).setY(0);const yaw=Math.atan2(d.x,d.z);e.group.rotation.y=angleLerp(e.group.rotation.y,yaw,dt*5);if(dist>7.5&&dist<16&&hasLOS(e)){const dir=d.normalize();const np=ep.clone().addScaledVector(dir,e.speed*1.18*dt);if(!collidesSurface(np))ep.copy(np);}e.shootCd-=dt;if(dist<13&&hasLOS(e)&&e.shootCd<=0)enemyShoot(e);if(dist>19)e.suspicion-=dt*.08;
+    } else {
+      const target=e.route[e.index],d=target.clone().sub(ep);d.y=0;if(d.length()<.25)e.index=(e.index+1)%e.route.length;else{d.normalize();const yaw=Math.atan2(d.x,d.z);e.group.rotation.y=angleLerp(e.group.rotation.y,yaw,dt*3.5);const np=ep.clone().addScaledVector(d,e.speed*dt);if(!collidesSurface(np))ep.copy(np);}
+      const effectiveRange=playerInBush()?2.2:(state.player.crouched?6.2:10);const toP=pp.clone().sub(ep).setY(0);const len=toP.length();if(len<effectiveRange){const f=new THREE.Vector3(Math.sin(e.group.rotation.y),0,Math.cos(e.group.rotation.y));const angle=Math.acos(clamp(f.dot(toP.clone().normalize()),-1,1));if(angle<Math.PI/5.4&&hasLOS(e)){e.suspicion+=dt*(state.player.crouched?.5:1.15)*(1.25-len/effectiveRange*.35);}else e.suspicion-=dt*.7;}else e.suspicion-=dt*.65;e.suspicion=clamp(e.suspicion,0,1.1);if(e.suspicion>=1){alertEnemy(e,true);toast('DETECTED — The Order is opening fire!');}
+    }
+    maxSusp=Math.max(maxSusp,e.suspicion);e.marker.visible=e.alert||e.suspicion>.55; if(!e.alert)e.cone.material.opacity=.10+e.suspicion*.13;updatePersonWalk(e.group,!e.alert||dist>7.5,t);
+  }
+  if(state.mode==='surface'){if(anyAlert)setStealth('ALERT','alert');else if(maxSusp>.35)setStealth('SPOTTED?','exposed');else if(playerInBush())setStealth('HIDDEN','hidden-state');else if(state.player.crouched)setStealth('CROUCHED','hidden-state');else setStealth('UNSEEN','safe');}
+}
+function angleLerp(a,b,t){let d=((b-a+Math.PI*3)%(Math.PI*2))-Math.PI;return a+d*clamp(t,0,1);}
+
+function performSurfaceAction(a){
+  if(!a)return; if(a.type==='resource'){const n=a.node;if(n.userData.depleted)return;const r=n.userData.resource,q=n.userData.qty,added=state.player.backpack.add(r,q);if(!added){toast('Backpack full.');return;}n.userData.qty-=added;if(r==='wood')state.progress.woodGathered+=added;if(r==='scrap')state.progress.scrapGathered+=added;particles(surfaceScene,n.position.clone().add(new THREE.Vector3(0,.4,0)),r==='wood'?0x9b7247:0x8c9189,10,.7);toast(`+${added} ${RES[r].label.toLowerCase()}.`);addXP(added*2);if(n.userData.qty<=0){n.userData.depleted=true;n.visible=false;}updateUI();}
+  else if(a.type==='dirtDump'){const q=state.player.backpack.count('dirt');if(!q){toast('No excavated dirt in your backpack.');return;}state.player.backpack.remove('dirt',q);state.progress.dirtDumped+=q;const s=clamp(.7+state.progress.dirtDumped/65,.7,1.8);dirtDump.scale.set(s,.55+s*.15,s);toast(`Dumped ${q} dirt above ground.`);updateUI();}
+  else if(a.type==='surfaceHatch'){if(state.player.backpack.count('dirt')>0){toast('Dump excavated dirt beside the hatch before going back underground.');return;}depositBackpack();npcArrive();enterBunker();}
+  else if(a.type==='cage'){if(!state.npc.rescued)rescueNpc();else toast('The cage is empty.');}
+}
+function requestSurfaceInteraction(obj){
+  const type=obj.userData.type;if(type==='resource'){if(obj.userData.depleted)return;setSurfaceDestination(obj.position,{type:'resource',node:obj});}
+  else if(type==='dirtDump')setSurfaceDestination(obj.position.clone().add(new THREE.Vector3(-1.2,0,0)),{type:'dirtDump'});
+  else if(type==='surfaceHatch')setSurfaceDestination(obj.position.clone().add(new THREE.Vector3(0,0,-1.2)),{type:'surfaceHatch'});
+  else if(type==='cage')setSurfaceDestination(obj.position.clone().add(new THREE.Vector3(0,0,1.4)),{type:'cage'});
+}
+function nearestSurfaceContext(){
+  const p=surfacePlayer.position;let best=null,bd=2.15;for(const n of resourceNodes){if(!n.visible)continue;const d=dist2D(p,n.position);if(d<bd){bd=d;best={type:'resource',node:n};}}const options=[[dirtDump,{type:'dirtDump'}],[surfaceHatch,{type:'surfaceHatch'}],[cage,{type:'cage'}]];for(const[o,a]of options){const d=dist2D(p,o.position);if(d<bd){bd=d;best=a;}}return best;
+}
+function contextInteract(){if(state.mode==='surface'){const a=nearestSurfaceContext();if(a)performSurfaceAction(a);else{let enemy=null,b=1.65;for(const e of enemies){if(!e.alive)continue;const d=dist2D(surfacePlayer.position,e.group.position);if(d<b){b=d;enemy=e;}}if(enemy)knifeAttack();else toast('Nothing close enough to interact with.');}}else{const h=window.bunkerHatch;if(dist2D(bunkerPlayer.position,h.position)<1.6)enterSurface();else toast('Move closer to the hatch or click something to interact.');}}
+
+function enterSurface(){state.mode='surface';state.player.crouched=false;surfacePlayer.position.copy(surfaceHatch.position).add(new THREE.Vector3(0,0,-1.5));surfaceTarget=null;pendingSurfaceAction=null;toast(state.player.backpack.count('dirt')?`Surface reached. Dump ${state.player.backpack.count('dirt')} dirt at the spoil pile.`:'Surface reached. Stay out of the vision cones.');updateUI();}
+function enterBunker(){state.mode='bunker';state.player.crouched=false;bunkerPlayer.position.copy(gridWorld(9,7));bunkerPath=[];pendingBunkerAction=null;toast('Back underground. Surface loot moved to base storage.');updateUI();}
+function depositBackpack(){for(const s of state.player.backpack.slots){if(!s||s.type==='dirt')continue;if(state.base.storage[s.type]===undefined)state.base.storage[s.type]=0;state.base.storage[s.type]+=s.qty;}state.player.backpack.slots=state.player.backpack.slots.map(s=>s?.type==='dirt'?s:null);}
+function useResource(type){if(state.player.backpack.count(type)<1)return;if(type==='food'){state.player.backpack.remove(type,1);state.player.hunger=clamp(state.player.hunger+34,0,100);toast('Ate food.');}else if(type==='water'){state.player.backpack.remove(type,1);state.player.thirst=clamp(state.player.thirst+42,0,100);toast('Drank water.');}else if(type==='medicine'){state.player.backpack.remove(type,1);state.player.hp=clamp(state.player.hp+45,0,maxHP());toast('Used medicine.');}updateUI();}
+function tryUpgradeBackpack(){if(state.mode!=='bunker'){toast('Upgrade the backpack while safely underground.');return;}if(state.progress.backpackUpgraded){toast('V0.1 backpack upgrade already installed.');return;}if(state.base.storage.cloth<4||state.base.storage.parts<2){toast('Need 4 cloth + 2 crafted parts in base storage.');return;}state.base.storage.cloth-=4;state.base.storage.parts-=2;state.player.backpack.expand(4);state.progress.backpackUpgraded=true;toast('Backpack upgraded: 8 → 12 slots.');addXP(30);updateUI();}
+
+// ---------------- EFFECTS / UI ----------------
+const fx=[];
+function particles(scene,pos,color,count=8,spread=.7){for(let i=0;i<count;i++){const m=box(.08,.08,.08,mat(color),pos.x,pos.y,pos.z);m.userData.vel=new THREE.Vector3(rand(-spread,spread),rand(.5,1.4),rand(-spread,spread));m.userData.life=rand(.35,.8);scene.add(m);fx.push({m,scene});}}
+function updateParticles(dt){for(let i=fx.length-1;i>=0;i--){const f=fx[i];f.m.userData.life-=dt;f.m.userData.vel.y-=2.8*dt;f.m.position.addScaledVector(f.m.userData.vel,dt);f.m.scale.multiplyScalar(.98);if(f.m.userData.life<=0){f.scene.remove(f.m);fx.splice(i,1);}}}
+function toast(msg){const d=document.createElement('div');d.className='toast';d.textContent=msg;ui.toast.appendChild(d);setTimeout(()=>d.remove(),2900);}
+function setStealth(text,cls){ui.stealth.textContent=text;ui.stealth.className=`stealth ${cls}`;}
+function updateSurvival(dt){if(!state.started||state.player.dead)return;state.gameMinutes+=dt*2.4;if(state.gameMinutes>=1440){state.gameMinutes-=1440;state.day++;}state.player.hunger=clamp(state.player.hunger-dt*.018,0,100);state.player.thirst=clamp(state.player.thirst-dt*.028,0,100);state.player.fatigue=clamp(state.player.fatigue-dt*(state.mode==='surface'?(surfaceMoving?.018:.009):.004),0,100);if(state.player.hunger<=0||state.player.thirst<=0)damagePlayer(dt*.65);}
+function objectives(){return[
+  {text:'Excavate a 4×4 space for a workshop',done:state.base.rooms.some(r=>r.def.type==='workshop')||[...bunkerDug].length>=28},
+  {text:'Dump excavated dirt above ground',done:state.progress.dirtDumped>=1},
+  {text:'Recover at least 16 wood and 4 scrap',done:(state.base.storage.wood+state.player.backpack.count('wood'))>=16&&(state.base.storage.scrap+state.player.backpack.count('scrap'))>=4},
+  {text:'Rescue Elise from The Order',done:state.npc.arrived},
+  {text:'Build a 4×4 workshop',done:state.base.workshopBuilt},
+  {text:'Assign Elise and automate production',done:state.npc.assigned}
+];}
+function renderStats(){ui.statsGrid.innerHTML='';for(const[key,[name,desc]]of Object.entries(statDefs)){const row=document.createElement('div');row.className='stat-row';const value=state.player.stats[key];row.innerHTML=`<div class="stat-name"><b>${name} // ${value}</b><span>${desc}</span></div><div class="stat-pips">${Array.from({length:10},(_,i)=>`<i class="${i<value?'on':''}"></i>`).join('')}</div><button ${state.player.statPoints<=0||value>=10?'disabled':''}>+ UPGRADE</button>`;row.querySelector('button').onclick=()=>spendStat(key);ui.statsGrid.appendChild(row);}}
+function updateNPCUI(){ui.npcCount.textContent=state.npc.arrived?'1':'0';ui.npcList.innerHTML='';if(!state.npc.arrived){ui.npcList.innerHTML='<div class="hint">No survivors in the bunker yet. Someone is being held at a surface checkpoint.</div>';return;}const n=document.createElement('div');n.className='npc-card';const pct=Math.round(state.npc.xp/state.npc.nextXp*100);n.innerHTML=`<div class="npc-name"><span>${state.npc.name}</span><b>LV ${state.npc.level}</b></div><div class="npc-role">${state.npc.status}</div><div class="npc-stats"><div class="npc-stat"><span>MEDICAL</span><b>${state.npc.skills.medical}</b></div><div class="npc-stat"><span>CRAFT</span><b>${state.npc.skills.craft}</b></div><div class="npc-stat"><span>COMBAT</span><b>${state.npc.skills.combat}</b></div></div><div class="npc-traits">${state.npc.traits.join(' · ')}<br>XP ${state.npc.xp}/${state.npc.nextXp} (${pct}%)</div><button>${state.npc.assigned?'UNASSIGN FROM WORKSHOP':'ASSIGN TO WORKSHOP'}</button>`;n.querySelector('button').onclick=toggleAssignNpc;ui.npcList.appendChild(n);}
+function updateUI(){
+  const p=state.player;ui.level.textContent=`LV ${p.level}`;ui.hpText.textContent=Math.ceil(p.hp);ui.hpBar.style.width=`${p.hp/maxHP()*100}%`;ui.hungerBar.style.width=`${p.hunger}%`;ui.thirstBar.style.width=`${p.thirst}%`;ui.fatigueBar.style.width=`${p.fatigue}%`;ui.mode.textContent=state.mode==='bunker'?'BUNKER // SAFE':'SURFACE // OCCUPIED';
+  const h=Math.floor(state.gameMinutes/60)%24,m=Math.floor(state.gameMinutes%60);ui.clock.textContent=`DAY ${String(state.day).padStart(2,'0')} // ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  ui.basePanel.classList.toggle('hidden',state.mode!=='bunker');ui.toggleSurvivors.classList.toggle('hidden',state.mode!=='bunker');if(state.mode!=='bunker')ui.npcPanel.classList.add('hidden');if(state.mode==='bunker')setStealth('SAFE','safe');
+  const os=objectives();ui.objectives.innerHTML=os.map(o=>`<div class="objective ${o.done?'done':''}">${o.text}</div>`).join('');
+  ui.storage.innerHTML='';for(const type of ['wood','scrap','food','water','medicine','cloth','parts']){const d=document.createElement('div');d.className=`stock ${state.base.storage[type]?'active':''}`;d.innerHTML=`<span>${RES[type].label}</span><b>${state.base.storage[type]||0}</b>`;ui.storage.appendChild(d);}ui.roomCount.textContent=`${state.base.rooms.length} ROOM${state.base.rooms.length===1?'':'S'}`;
+  ui.backpack.innerHTML='';for(let i=0;i<p.backpack.size;i++){const s=p.backpack.slots[i];const d=document.createElement('div');d.className=`slot ${s?'filled':''} ${s&&RES[s.type].usable?'usable':''}`;if(s){d.innerHTML=`<span class="icon">${RES[s.type].icon}</span><span class="res-name">${RES[s.type].label}</span><b class="qty">${s.qty}</b>`;if(RES[s.type].usable)d.onclick=()=>useResource(s.type);}ui.backpack.appendChild(d);}ui.used.textContent=p.backpack.used(); const total=$('slot-total'); if(total) total.textContent=p.backpack.size;
+  ui.points.textContent=`${p.statPoints} point${p.statPoints===1?'':'s'}`;ui.statsLevel.textContent=p.level;ui.xpLabel.textContent=`${p.xp} / ${p.nextXp}`;ui.statPoints.textContent=p.statPoints;ui.xpMeter.style.width=`${p.xp/p.nextXp*100}%`;renderStats();updateNPCUI();
+  const packNote=document.querySelector('.backpack-note');if(packNote){packNote.innerHTML=`Stacks up to <strong>99</strong>. Knife is equipped outside the pack. <button id="pack-upgrade-inline">${state.progress.backpackUpgraded?'12-slot upgrade installed':'Upgrade 8→12: 4 cloth + 2 parts'}</button>`;const b=$('pack-upgrade-inline');if(b)b.onclick=tryUpgradeBackpack;}
+  ui.btnCrouch.classList.toggle('active',p.crouched);
+}
+
+function updateContextCard(){
+  if(state.mode==='surface'){
+    const a=nearestSurfaceContext();let enemy=null,b=1.6;for(const e of enemies){if(!e.alive)continue;const d=dist2D(surfacePlayer.position,e.group.position);if(d<b){b=d;enemy=e;}}
+    if(enemy){ui.context.classList.remove('hidden');ui.contextTitle.textContent=isBehind(enemy)&&!enemy.alert?'SILENT TAKEDOWN':'CLOSE COMBAT';ui.contextCopy.textContent=isBehind(enemy)&&!enemy.alert?'You are behind the guard. The knife will not alert the others.':'Attacking from here will alert nearby guards.';ui.contextAction.textContent='Q // KNIFE';ui.contextAction.onclick=knifeAttack;return;}
+    if(a){ui.context.classList.remove('hidden');if(a.type==='resource'){const r=a.node.userData.resource;ui.contextTitle.textContent=`SALVAGE ${RES[r].label.toUpperCase()}`;ui.contextCopy.textContent=`Take ${a.node.userData.qty} ${RES[r].label.toLowerCase()} into the backpack.`;ui.contextAction.textContent='E // GATHER';}
+      if(a.type==='dirtDump'){ui.contextTitle.textContent='SPOIL PILE';ui.contextCopy.textContent=`Dump ${state.player.backpack.count('dirt')} excavated dirt here.`;ui.contextAction.textContent='E // DUMP DIRT';}
+      if(a.type==='surfaceHatch'){ui.contextTitle.textContent='BUNKER HATCH';ui.contextCopy.textContent=state.player.backpack.count('dirt')?'Dump your excavated dirt before returning underground.':'Return underground and deposit gathered resources.';ui.contextAction.textContent='E // ENTER BUNKER';}
+      if(a.type==='cage'){ui.contextTitle.textContent='PRISONER';ui.contextCopy.textContent=state.npc.rescued?'The prisoner is already free.':'Elise is being held by The Order. Open the cage.';ui.contextAction.textContent='E // RESCUE';}ui.contextAction.onclick=()=>performSurfaceAction(a);return;}
+  } else {const d=dist2D(bunkerPlayer.position,window.bunkerHatch.position);if(d<1.65){ui.context.classList.remove('hidden');ui.contextTitle.textContent='SURFACE HATCH';ui.contextCopy.textContent=state.player.backpack.count('dirt')?`Carry ${state.player.backpack.count('dirt')} dirt up and dump it outside.`:'Leave the safe bunker and enter occupied territory.';ui.contextAction.textContent='E // GO TO SURFACE';ui.contextAction.onclick=enterSurface;return;}}
+  ui.context.classList.add('hidden');
+}
+
+// ---------------- INPUT ----------------
+function pointerRay(e){const r=renderer.domElement.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;raycaster.setFromCamera(mouse,camera);}
+function findTyped(obj){let o=obj;while(o){if(o.userData?.type)return o;o=o.parent;}return null;}
+renderer.domElement.addEventListener('pointerdown',e=>{
+  if(!state.started||state.player.dead)return;pointerRay(e);
+  if(state.mode==='surface'){
+    const hits=raycaster.intersectObjects(surfaceInteractives,true);if(!hits.length)return;let typed=null;for(const h of hits){const t=findTyped(h.object);if(t){typed=t;break;}}if(!typed)return;
+    if(['resource','dirtDump','surfaceHatch','cage'].includes(typed.userData.type)){requestSurfaceInteraction(typed);return;}
+    if(typed.userData.type==='enemy'){const eObj=enemies[typed.userData.enemyIndex];if(eObj?.alive){const dir=new THREE.Vector3(Math.sin(eObj.group.rotation.y),0,Math.cos(eObj.group.rotation.y));setSurfaceDestination(eObj.group.position.clone().addScaledVector(dir,-1.15));return;}}
+    if(typed.userData.type==='surfaceGround'){setSurfaceDestination(hits[0].point);}
+  } else {
+    const hits=raycaster.intersectObjects(bunkerInteractive,true);if(!hits.length)return;let typed=null;for(const h of hits){const t=findTyped(h.object);if(t){typed=t;break;}}if(!typed)return;
+    const type=typed.userData.type;if(type==='earth'){if(state.selectedBuild){toast('Cancel placement mode before digging.');return;}requestDig(typed.userData.gx,typed.userData.gz);}
+    else if(type==='bunkerFloor'){if(state.selectedBuild)tryPlaceRoom(typed.userData.gx,typed.userData.gz);else setBunkerPathTo(typed.userData.gx,typed.userData.gz);}
+    else if(type==='bunkerHatch'){if(state.selectedBuild){toast('Cancel placement mode first.');return;}setBunkerPathTo(typed.userData.gx,typed.userData.gz,{type:'hatch'});}
+  }
+});
+renderer.domElement.addEventListener('wheel',e=>{cameraZoom=clamp(cameraZoom+(e.deltaY>0?-.09:.09),.66,1.55);e.preventDefault();},{passive:false});
+window.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();ui.statsModal.classList.toggle('hidden');updateUI();return;}if(e.key==='Escape'){ui.statsModal.classList.add('hidden');state.selectedBuild=null;document.querySelectorAll('.build-btn').forEach(b=>b.classList.remove('selected'));return;}if(e.key.toLowerCase()==='q')knifeAttack();if(e.key.toLowerCase()==='c'&&state.mode==='surface'){state.player.crouched=!state.player.crouched;toast(state.player.crouched?'Crouched — visibility reduced.':'Standing.');updateUI();}if(e.key.toLowerCase()==='e')contextInteract();});
+ui.btnKnife.onclick=knifeAttack;ui.btnCrouch.onclick=()=>{if(state.mode!=='surface'){toast('Crouching matters on the surface.');return;}state.player.crouched=!state.player.crouched;updateUI();};ui.btnInteract.onclick=contextInteract;ui.btnStats.onclick=()=>ui.statsModal.classList.toggle('hidden');
+document.querySelectorAll('.build-btn').forEach(b=>b.onclick=()=>selectBuild(b.dataset.room));
+document.querySelectorAll('.modal-close').forEach(b=>b.onclick=()=>$(b.dataset.close).classList.add('hidden'));
+ui.toggleSurvivors.onclick=()=>ui.npcPanel.classList.toggle('hidden');
+$('start-game').onclick=()=>{state.started=true;ui.intro.classList.add('hidden');toast('The shelter is safe, but the emergency stores are limited. Scavenge above or dig outward to expand.');};
+$('reload-game').onclick=()=>location.reload();
+
+function resize(){const w=window.innerWidth,h=window.innerHeight,aspect=w/h,view=15;camera.left=-view*aspect;camera.right=view*aspect;camera.top=view;camera.bottom=-view;camera.updateProjectionMatrix();const scale=w>1500?.78:w>900?.84:.9;renderer.setSize(Math.floor(w*scale),Math.floor(h*scale),false);renderer.domElement.style.width=`${w}px`;renderer.domElement.style.height=`${h}px`;}
+window.addEventListener('resize',resize);resize();
+
+function updateCamera(dt){const aspect=window.innerWidth/window.innerHeight;const base=state.mode==='surface'?12.8:6.9;const view=base/cameraZoom;camera.left=-view*aspect;camera.right=view*aspect;camera.top=view;camera.bottom=-view;camera.updateProjectionMatrix();let target;if(state.mode==='surface'){target=surfacePlayer.position.clone();const desired=target.clone().add(new THREE.Vector3(17,20,17));camera.position.lerp(desired,clamp(dt*5,0,1));camera.lookAt(target.clone().add(new THREE.Vector3(0,.25,0)));}else{target=bunkerPlayer.position.clone();const desired=target.clone().add(new THREE.Vector3(10.8,14.8,10.8));camera.position.lerp(desired,clamp(dt*5,0,1));camera.lookAt(target.clone().add(new THREE.Vector3(0,.18,0)));}}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05),t=performance.now()/1000;if(window.bunkerEmergencyLight){const pulse=.93+Math.sin(t*2.1)*.035+(Math.sin(t*17.0)>0.985?-.10:0);window.bunkerEmergencyLight.intensity=7.5*pulse;if(window.bunkerEmergencyGlow)window.bunkerEmergencyGlow.material.emissiveIntensity=3.4*pulse;}if(state.started&&!state.player.dead){updateSurvival(dt);updateNpcWork(dt);if(state.mode==='surface'){updateSurfacePlayer(dt,t);updateEnemies(dt,t);}else updateBunkerPlayer(dt,t);updateParticles(dt);updateContextCard();if(Math.floor(t*2)%2===0)updateUI();}updateCamera(dt);renderer.render(state.mode==='surface'?surfaceScene:bunkerScene,camera);}
+
+updateUI();
+setTimeout(()=>{ui.loading.style.opacity='0';setTimeout(()=>ui.loading.remove(),520);},650);
+animate();
+console.log(`UNDERGROUND playable concept ${BUILD}`);
+
+  </script>
+</body>
+</html>
