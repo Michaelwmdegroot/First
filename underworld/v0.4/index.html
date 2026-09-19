@@ -187,7 +187,7 @@ kbd{width:22px;height:22px;display:flex;align-items:center;justify-content:cente
           <div><b>1</b><span>DIG</span><small>Every excavated grid block becomes 1 dirt in your backpack.</small></div>
           <div><b>2</b><span>GO UP</span><small>Dump dirt, sneak past patrols and gather wood/supplies.</small></div>
           <div><b>3</b><span>RESCUE</span><small>Bring survivors underground and put their skills to work.</small></div>
-          <div><b>4</b><span>BUILD</span><small>Every room tile costs 1 wood, plus specialist materials.</small></div>
+          <div><b>4</b><span>BUILD</span><small>Every shell tile costs 1 wood; rooms then require completed shell plus specialist materials.</small></div>
         </div>
         <div class="controls-line"><span>CLICK</span> move / interact <span>Q</span> knife <span>C</span> crouch <span>E</span> context <span>TAB</span> stats <span>WHEEL</span> zoom</div>
         <button id="start-game" class="primary">ENTER THE BUNKER</button>
@@ -796,7 +796,7 @@ function setSurfaceDestination(v,action=null){
   if(!path.length&&dist2D(surfacePlayer.position,goal)>.35){surfacePath=[];surfaceTarget=null;toast('No route to that location.');return false;}
   surfaceTarget=goal;surfacePath=path;return true;
 }
-function updatePersonWalk(model,moving,t){function updatePersonWalk(model,moving,t){if(!model?.userData?.parts)return;const p=model.userData.parts;const swing=moving?Math.sin(t*10)*.48:0;p.l1.rotation.x=swing;p.l2.rotation.x=-swing;p.a1.rotation.x=-swing*.55;p.a2.rotation.x=swing*.55;}
+function updatePersonWalk(model,moving,t){if(!model?.userData?.parts)return;const p=model.userData.parts;const swing=moving?Math.sin(t*10)*.48:0;p.l1.rotation.x=swing;p.l2.rotation.x=-swing;p.a1.rotation.x=-swing*.55;p.a2.rotation.x=swing*.55;}
 function updateSurfacePlayer(dt,t){
   let moving=false;
   if(surfacePath.length){
@@ -812,7 +812,7 @@ function updateSurfacePlayer(dt,t){
   updatePersonWalk(surfacePlayer,moving,t);surfaceMoving=moving;
   if(rescuedFollower){const off=new THREE.Vector3(-.75,0,-.65).applyAxisAngle(new THREE.Vector3(0,1,0),surfacePlayer.rotation.y);const target=surfacePlayer.position.clone().add(off);const d=target.sub(rescuedFollower.position);d.y=0;if(d.length()>.15){const dir=d.normalize();rescuedFollower.position.addScaledVector(dir,Math.min(2.6*dt,d.length()));rescuedFollower.rotation.y=Math.atan2(dir.x,dir.z);updatePersonWalk(rescuedFollower,true,t);}else updatePersonWalk(rescuedFollower,false,t);}
 }
-function updateBunkerPlayer(dt,t){function updateBunkerPlayer(dt,t){let moving=false;if(state.digging){updatePersonWalk(bunkerPlayer,false,t);bunkerMoving=false;return;}if(bunkerPath.length){const target=bunkerPath[0];const d=target.clone().sub(bunkerPlayer.position);d.y=0;if(d.length()>.06){d.normalize();bunkerPlayer.position.addScaledVector(d,Math.min((2.5+state.player.stats.stamina*.08)*dt,target.clone().sub(bunkerPlayer.position).length()));bunkerPlayer.rotation.y=Math.atan2(d.x,d.z);moving=true;}else{bunkerPlayer.position.copy(target);bunkerPath.shift();}}else if(pendingBunkerAction){const a=pendingBunkerAction;pendingBunkerAction=null;if(a.type==='dig')beginDig(a.gx,a.gz);else if(a.type==='shell')buildShellTile(a.gx,a.gz);else if(a.type==='hatch')enterSurface();else if(a.type==='takePickaxe')takeCopperPickaxe();else if(a.type==='takeHammer')takeHammer();}updatePersonWalk(bunkerPlayer,moving,t);bunkerMoving=moving;}
+function updateBunkerPlayer(dt,t){let moving=false;if(state.digging){updatePersonWalk(bunkerPlayer,false,t);bunkerMoving=false;return;}if(bunkerPath.length){const target=bunkerPath[0];const d=target.clone().sub(bunkerPlayer.position);d.y=0;if(d.length()>.06){d.normalize();bunkerPlayer.position.addScaledVector(d,Math.min((2.5+state.player.stats.stamina*.08)*dt,target.clone().sub(bunkerPlayer.position).length()));bunkerPlayer.rotation.y=Math.atan2(d.x,d.z);moving=true;}else{bunkerPlayer.position.copy(target);bunkerPath.shift();}}else if(pendingBunkerAction){const a=pendingBunkerAction;pendingBunkerAction=null;if(a.type==='dig')beginDig(a.gx,a.gz);else if(a.type==='shell')buildShellTile(a.gx,a.gz);else if(a.type==='hatch')enterSurface();else if(a.type==='takePickaxe')takeCopperPickaxe();else if(a.type==='takeHammer')takeHammer();}updatePersonWalk(bunkerPlayer,moving,t);bunkerMoving=moving;}
 
 function isBehind(enemy){const toP=surfacePlayer.position.clone().sub(enemy.group.position).setY(0).normalize();const f=new THREE.Vector3(Math.sin(enemy.group.rotation.y),0,Math.cos(enemy.group.rotation.y));return f.dot(toP)<-.28;}
 function knifeAttack(){
@@ -871,7 +871,7 @@ function nearestSurfaceContext(){
   const options=[[surfaceHatch,{type:'surfaceHatch'}],[cage,{type:'cage'}]];for(const[o,a]of options){const d=dist2D(p,o.position);if(d<bd){bd=d;best=a;}}
   return best;
 }
-function contextInteract(){if(state.mode==='surface'){const a=nearestSurfaceContext();if(a)performSurfaceAction(a);else{let enemy=null,b=1.65;for(const e of enemies){if(!e.alive)continue;const d=dist2D(surfacePlayer.position,e.group.position);if(d<b){b=d;enemy=e;}}if(enemy)knifeAttack();else toast('Nothing close enough to interact with.');}}else{const p=window.bunkerPickaxe;if(p&&p.visible&&dist2D(bunkerPlayer.position,p.position)<1.7){takeCopperPickaxe();return;}const h=window.bunkerHatch;if(dist2D(bunkerPlayer.position,h.position)<1.6)enterSurface();else toast('Move closer to the hatch, pickaxe or excavation edge.');}}
+function contextInteract(){if(state.mode==='surface'){const a=nearestSurfaceContext();if(a)performSurfaceAction(a);else{let enemy=null,b=1.65;for(const e of enemies){if(!e.alive)continue;const d=dist2D(surfacePlayer.position,e.group.position);if(d<b){b=d;enemy=e;}}if(enemy)knifeAttack();else toast('Nothing close enough to interact with.');}}else{const p=window.bunkerPickaxe;if(p&&p.visible&&dist2D(bunkerPlayer.position,p.position)<1.7){takeCopperPickaxe();return;}const hm=window.bunkerHammer;if(hm&&hm.visible&&dist2D(bunkerPlayer.position,hm.position)<1.7){takeHammer();return;}const h=window.bunkerHatch;if(dist2D(bunkerPlayer.position,h.position)<1.6)enterSurface();else toast('Move closer to the hatch, tools or excavation edge.');}}
 
 function enterSurface(){state.mode='surface';state.player.crouched=false;clearBuildPreview();surfacePlayer.position.copy(surfaceHatch.position).add(new THREE.Vector3(0,0,-1.5));surfaceTarget=null;surfacePath=[];pendingSurfaceAction=null;toast(state.player.backpack.count('dirt')?`Surface reached with ${state.player.backpack.count('dirt')} dirt. Find a hidden dumpster before returning.`:'Surface reached in the city park. Cars may hold supplies — watch the patrols.');updateUI();}
 function enterBunker(){state.mode='bunker';state.player.crouched=false;surfacePath=[];bunkerPlayer.position.copy(gridWorld(9,7));bunkerPath=[];pendingBunkerAction=null;toast('Back underground. Surface loot moved to base storage.');updateUI();}
@@ -971,7 +971,7 @@ renderer.domElement.addEventListener('pointerdown',e=>{
     else if(type==='bunkerHammer')setBunkerPathTo(gx,gz,{type:'takeHammer'});
   }
 });
-renderer.domElement.addEventListener('wheel',e=>renderer.domElement.addEventListener('wheel',e=>{cameraZoom=clamp(cameraZoom+(e.deltaY>0?-.09:.09),.66,1.55);e.preventDefault();},{passive:false});
+renderer.domElement.addEventListener('wheel',e=>{cameraZoom=clamp(cameraZoom+(e.deltaY>0?-.09:.09),.66,1.55);e.preventDefault();},{passive:false});
 window.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();ui.statsModal.classList.toggle('hidden');updateUI();return;}if(e.key==='Escape'){ui.statsModal.classList.add('hidden');cancelBuildMode();return;}if(e.key.toLowerCase()==='q')knifeAttack();if(e.key.toLowerCase()==='c'&&state.mode==='surface'){state.player.crouched=!state.player.crouched;toast(state.player.crouched?'Crouched — visibility reduced.':'Standing.');updateUI();}if(e.key.toLowerCase()==='e')contextInteract();});
 ui.btnKnife.onclick=knifeAttack;ui.btnCrouch.onclick=()=>{if(state.mode!=='surface'){toast('Crouching matters on the surface.');return;}state.player.crouched=!state.player.crouched;updateUI();};ui.btnInteract.onclick=contextInteract;ui.btnStats.onclick=()=>ui.statsModal.classList.toggle('hidden');
 document.querySelectorAll('[data-room]').forEach(b=>b.onclick=()=>selectBuild(b.dataset.room));$('build-shell').onclick=selectShellMode;
