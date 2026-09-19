@@ -478,7 +478,7 @@ function accessibleDigNeighbor(gx,gz){
 function activeDigTool(){
   const t=state.player.tools;
   if(t.equipped==='copper'&&t.foundCopper&&t.copper.durability>0)return {kind:'copper',name:'Copper Pickaxe',dur:t.copper.durability,max:t.copper.max,time:3.1};
-  if(t.equipped==='stone'&&t.stone&&t.stone.durability>0)return {kind:'stone',name:'Stone Pick',dur:t.stone.durability,max:t.stone.max,time:5.2};
+  if(t.equipped==='stone'&&t.stone&&t.stone.durability>0)return {kind:'stone',name:'Stone Axe',dur:t.stone.durability,max:t.stone.max,time:5.2};
   return null;
 }
 function takeCopperPickaxe(){
@@ -490,7 +490,7 @@ function craftStoneTool(){
   if(state.mode!=='bunker'){toast('Craft primitive tools in the shelter.');return;}
   if(state.base.storage.stone<2||state.base.storage.wood<1){toast('Stone pick needs 2 stone + 1 wood.');return;}
   state.base.storage.stone-=2;state.base.storage.wood-=1;state.player.tools.stone={durability:5,max:5};state.player.tools.equipped='stone';
-  toast('Crafted a crude stone pick. It will only survive 5 blocks.');updateUI();
+  toast('Crafted a crude stone axe. It will only survive 5 blocks.');updateUI();
 }
 function repairCopperTool(){
   const t=state.player.tools;if(!t.foundCopper){toast('You have not found the copper pickaxe.');return;}
@@ -500,7 +500,7 @@ function repairCopperTool(){
 function requestDig(gx,gz){
   if(!earthMeshes.has(keyOf(gx,gz))||state.digging)return;
   const tool=activeDigTool();
-  if(!tool){toast(state.player.tools.foundCopper?'Your digging tool is broken. Repair it or craft a stone pick.':'You need a digging tool. Search the shelter for the old copper pickaxe.');return;}
+  if(!tool){toast(state.player.tools.foundCopper?'Your digging tool is broken. Repair it or craft a stone axe.':'You need a digging tool. Search the shelter for the old copper pickaxe.');return;}
   if(state.player.backpack.capacity('dirt')<100){toast('Need room for 100 dirt before breaking this block. Dump dirt in a hidden container above ground.');return;}
   const n=accessibleDigNeighbor(gx,gz);if(!n){toast('You can only excavate earth beside an open tile.');return;}
   setBunkerPathTo(n[0],n[1],{type:'dig',gx,gz});
@@ -523,8 +523,8 @@ function finishDig(gx,gz,toolKind){
   bunkerScene.remove(e);earthMeshes.delete(k);addOpenFloor(gx,gz);
   particles(bunkerScene,gridWorld(gx,gz).add(new THREE.Vector3(0,.6,0)),0x8b6845,16,1.0);addXP(6);
   const t=state.player.tools;
-  if(toolKind==='copper'){t.copper.durability=Math.max(0,t.copper.durability-1);if(t.copper.durability===0){t.equipped=null;toast('+100 dirt — copper pickaxe BROKE. Find copper to repair it, or craft a stone pick.');}else toast(`+100 dirt — copper pickaxe ${t.copper.durability}/${t.copper.max}.`);}
-  else if(toolKind==='stone'&&t.stone){t.stone.durability=Math.max(0,t.stone.durability-1);if(t.stone.durability===0){t.equipped=null;toast('+100 dirt — the stone pick shattered.');}else toast(`+100 dirt — stone pick ${t.stone.durability}/${t.stone.max}.`);}
+  if(toolKind==='copper'){t.copper.durability=Math.max(0,t.copper.durability-1);if(t.copper.durability===0){t.equipped=null;toast('+100 dirt — copper pickaxe BROKE. Find copper to repair it, or craft a stone axe.');}else toast(`+100 dirt — copper pickaxe ${t.copper.durability}/${t.copper.max}.`);}
+  else if(toolKind==='stone'&&t.stone){t.stone.durability=Math.max(0,t.stone.durability-1);if(t.stone.durability===0){t.equipped=null;toast('+100 dirt — the stone axe shattered.');}else toast(`+100 dirt — stone axe ${t.stone.durability}/${t.stone.max}.`);}
   updateUI();
 }
 
@@ -782,9 +782,9 @@ function updateUI(){
   if(ui.toolStatus){
     const t=p.tools;let name='NO DIGGING TOOL',dur=0,max=1,desc='The shelter contains an old copper pickaxe. Find it before excavating.';
     if(t.equipped==='copper'&&t.foundCopper){name='COPPER PICKAXE';dur=t.copper.durability;max=t.copper.max;desc='Original tool. Repair to 40 durability with 2 copper.';}
-    else if(t.equipped==='stone'&&t.stone){name='STONE PICK';dur=t.stone.durability;max=t.stone.max;desc='Crude fallback. Slow and fragile: only 5 blocks.';}
-    else if(t.foundCopper&&t.copper.durability<=0){name='COPPER PICKAXE — BROKEN';dur=0;max=t.copper.max;desc='Repair with 2 copper, or make a crude stone pick.';}
-    ui.toolStatus.innerHTML=`<div class="tool-name"><span>${name}</span><b>${dur}/${max}</b></div><div class="tool-meter"><i style="width:${clamp(dur/max*100,0,100)}%"></i></div><small>${desc}</small><div class="tool-actions"><button id="craft-stone-tool">STONE PICK<br>2 stone + 1 wood</button><button id="repair-copper-tool">REPAIR COPPER<br>2 copper</button></div>`;
+    else if(t.equipped==='stone'&&t.stone){name='STONE AXE';dur=t.stone.durability;max=t.stone.max;desc='Crude fallback. Slow and fragile: only 5 blocks.';}
+    else if(t.foundCopper&&t.copper.durability<=0){name='COPPER PICKAXE — BROKEN';dur=0;max=t.copper.max;desc='Repair with 2 copper, or make a crude stone axe.';}
+    ui.toolStatus.innerHTML=`<div class="tool-name"><span>${name}</span><b>${dur}/${max}</b></div><div class="tool-meter"><i style="width:${clamp(dur/max*100,0,100)}%"></i></div><small>${desc}</small><div class="tool-actions"><button id="craft-stone-tool">STONE AXE<br>2 stone + 1 wood</button><button id="repair-copper-tool">REPAIR COPPER<br>2 copper</button></div>`;
     const cs=$('craft-stone-tool'),rc=$('repair-copper-tool');if(cs)cs.onclick=craftStoneTool;if(rc)rc.onclick=repairCopperTool;
   }
 }
