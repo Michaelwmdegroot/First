@@ -235,8 +235,6 @@ const RES = {
   valuables:{label:'Valuables',icon:'♦'}, money:{label:'Money',icon:'$'}
 };
 
-class Inventory};
-
 class Inventory {
   constructor(size = 8) { this.size = size; this.slots = Array.from({ length: size }, () => null); }
   count(type) { return this.slots.reduce((n, s) => n + (s?.type === type ? s.qty : 0), 0); }
@@ -612,7 +610,6 @@ for(let z=-4;z<=4;z+=2){const p=box(.16,1.25,.16,mat(0x4a4338),2.7,.62,z);surfac
 // Hatch hidden inside the city park.
 const surfaceHatch=new THREE.Group();surfaceHatch.add(box(1.25,.18,1.25,mat(0x3e4540,.6,.5),0,.09,0));surfaceHatch.add(box(1.0,.12,1.0,mat(0x292f2b,.45,.6),0,.19,0));surfaceHatch.position.set(-20,0,16);surfaceHatch.userData={type:'surfaceHatch'};surfaceScene.add(surfaceHatch);surfaceInteractives.push(surfaceHatch);
 
-function makeResourceNode
 function makeResourceNode(type,qty,x,z){
   const g=new THREE.Group();
   if(type==='wood'){for(let i=0;i<5;i++){const log=cyl(.16,.16,1.4,6,mat(0x65472e),0,.18,i*.18-.36);log.rotation.z=Math.PI/2;log.rotation.y=rand(-.08,.08);g.add(log);}}
@@ -625,7 +622,7 @@ function makeResourceNode(type,qty,x,z){
   ['scrap',4,5,12],['scrap',4,17,10],['scrap',5,8,-9],['scrap',3,-12,-18],
   ['food',2,-17,-11],['water',2,-10,24],['medicine',1,21,-19],['cloth',3,13,-18],
   ['stone',4,-6,24],['stone',4,22,18]
-].forEach(a=>makeResourceNode(...a));].forEach(a=>makeResourceNode(...a));
+].forEach(a=>makeResourceNode(...a));
 
 function makeLootMarker(type,label,items,x,z){
   const g=new THREE.Group();g.add(box(.62,.28,.46,mat(type==='guardLoot'?0x4e4032:0x444944),0,.16,0));const glint=box(.18,.05,.18,mat(0xd1a85d),0,.34,0);glint.rotation.y=Math.PI/4;g.add(glint);
