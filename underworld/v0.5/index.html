@@ -577,7 +577,7 @@ function makeShellVisual(gx,gz){
   const brace2=box(TILE*.80,.065,.065,metalMat,p.x,.39,p.z);brace2.rotation.y=-Math.PI/4;g.add(brace2);
   bunkerScene.add(g);shellMeshes.set(k,g);return g;
 }
-function canBuildShell(gx,gz){function canBuildShell(gx,gz){
+function canBuildShell(gx,gz){
   const k=keyOf(gx,gz);
   return bunkerDug.has(k)&&!state.base.shellCells.has(k)&&!state.base.roomCells.has(k);
 }
@@ -714,7 +714,7 @@ function addCityBuilding(x,z,w,d,h,color=0x736f66){
   g.add(cyl(.20,.22,.55,8,mat(0x636964,.6,.48),w*.20,h+.50,d*.12));
   g.position.set(x,0,z);surfaceScene.add(g);obstacles.push({x,z,w:w+.3,d:d+.3});losBlockers.push(g);return g;
 }
-function addLampPost(x,z){function addLampPost(x,z){const g=new THREE.Group();g.add(cyl(.06,.08,2.7,6,mat(0x353938,.5,.65),0,1.35,0));g.add(box(.38,.16,.24,mat(0x545b56),0,2.68,0));g.position.set(x,0,z);surfaceScene.add(g);}
+function addLampPost(x,z){const g=new THREE.Group();g.add(cyl(.06,.08,2.7,6,mat(0x353938,.5,.65),0,1.35,0));g.add(box(.38,.16,.24,mat(0x545b56),0,2.68,0));g.position.set(x,0,z);surfaceScene.add(g);}
 function makeCar(x,z,rot=0,label='Abandoned car',loot=null){
   const palette=[0x55656b,0x6c5a4f,0x4e6251,0x6a6660,0x554f63,0x706246],ci=Math.abs(Math.floor(x*13+z*7))%palette.length,c=palette[ci];
   const g=new THREE.Group(),bodyMat=mat(c,.64,.32),trimMat=mat(0x252927,.5,.6),glassMat=mat(0x26383e,.28,.24);
@@ -732,7 +732,7 @@ function makeCar(x,z,rot=0,label='Abandoned car',loot=null){
   surfaceScene.add(g);surfaceInteractives.push(g);lootNodes.push(g);
   const ww=Math.abs(Math.cos(rot))*2.3+Math.abs(Math.sin(rot))*1.18,dd=Math.abs(Math.sin(rot))*2.3+Math.abs(Math.cos(rot))*1.18;obstacles.push({x,z,w:ww,d:dd});losBlockers.push(chassis);return g;
 }
-function makeDumpster(x,z,rot=0){function makeDumpster(x,z,rot=0){
+function makeDumpster(x,z,rot=0){
   const g=new THREE.Group();g.add(box(1.65,.92,1.0,mat(0x3f584c,.75,.38),0,.46,0));const lid=box(1.72,.10,1.04,mat(0x293b34,.65,.40),0,.95,0);lid.rotation.z=-.05;g.add(lid);
   g.position.set(x,0,z);g.rotation.y=rot;g.userData={type:'dirtDump',label:'hidden waste container'};surfaceScene.add(g);surfaceInteractives.push(g);dirtDumps.push(g);
 }
@@ -1033,7 +1033,7 @@ renderer.domElement.addEventListener('pointermove',e=>{
   if(state.buildMode==='room'&&state.selectedBuild)updateBuildPreview(cell.x,cell.z);
   else if(state.buildMode==='shell')updateShellPreview(cell.x,cell.z);
 });
-renderer.domElement.addEventListener('pointerdown',e=>{renderer.domElement.addEventListener('pointerdown',e=>{
+renderer.domElement.addEventListener('pointerdown',e=>{
   if(!state.started||state.player.dead)return;pointerRay(e);
   if(state.mode==='surface'){
     const hits=raycaster.intersectObjects(surfaceInteractives,true);if(!hits.length)return;let typed=null;for(const h of hits){const t=findTyped(h.object);if(t){typed=t;break;}}if(!typed)return;
