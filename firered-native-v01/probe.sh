@@ -103,7 +103,7 @@ for src in "${sources[@]}"; do
   say "--- $src ---"
 
   if clang "${FLAGS[@]}" -E "$src" 2>>"$err" \
-      | tools/preproc/preproc -i -g build/assets "$src" charmap.txt 2>>"$err" \
+      | tools/preproc/preproc -i "$src" charmap.txt 2>>"$err" \
       | clang "${FLAGS[@]}" -x c -O0 -c - -o "$out" 2>>"$err"; then
     say "PASS $src"
     pass=$((pass + 1))
