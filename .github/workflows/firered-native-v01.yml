@@ -13,34 +13,34 @@ permissions:
   contents: read
 
 jobs:
-  bootstrap:
+  compile-probe:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install WASM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld build-essential python3 git libpng-dev
+
       - name: Toolchain
         run: |
-          uname -a
           clang --version
           wasm-ld --version
           python3 --version
 
-      - name: Fetch native FireRed base
-        run: |
-          git clone https://github.com/jommg/pokefirered-pc-port.git /tmp/pokefirered-pc
-          git -C /tmp/pokefirered-pc checkout ea42ca1672eb457ba86442093a6df3119fbcee5f
-          git -C /tmp/pokefirered-pc rev-parse HEAD
+      - name: Run FireRed native-to-WASM compile probe
+        run: bash firered-native-v01/probe.sh
 
-      - name: Record platform inventory
+      - name: Show probe result
+        if: always()
         run: |
-          printf '%s\n' "FireRed native base:" > firered-native-v01/bootstrap-result.txt
-          git -C /tmp/pokefirered-pc rev-parse HEAD >> firered-native-v01/bootstrap-result.txt
-          printf '%s\n' "Platform sources:" >> firered-native-v01/bootstrap-result.txt
-          find /tmp/pokefirered-pc/src/platform -maxdepth 1 -type f -printf '%f\n' | sort >> firered-native-v01/bootstrap-result.txt
-          cat firered-native-v01/bootstrap-result.txt
+          test -f firered-native-v01/probe.log && tail -n 180 firered-native-v01/probe.log || true
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: firered-native-bootstrap
-          path: firered-native-v01/bootstrap-result.txt
+          name: firered-native-wasm-probe
+          path: firered-native-v01/probe.log
+          if-no-files-found: warn
