@@ -54,6 +54,10 @@ mkdir -p "$FIRE/include/wasm" "$FIRE/build/wasm" "$FIRE/build/assets"
 cp "$EMERALD/include/wasm/string.h" "$FIRE/include/wasm/string.h"
 cp "$EMERALD/include/wasm/stdio.h" "$FIRE/include/wasm/stdio.h"
 cp "$EMERALD/include/wasm/stdlib.h" "$FIRE/include/wasm/stdlib.h"
+cat >> "$FIRE/include/wasm/stdio.h" <<'EOF'
+int printf(const char *format, ...);
+int puts(const char *s);
+EOF
 
 FLAGS=(
   --target=wasm32-unknown-unknown
@@ -72,10 +76,13 @@ FLAGS=(
   -Wno-unknown-attributes
   -Wno-ignored-attributes
   -Wno-incompatible-library-redeclaration
+  -Wno-int-conversion
   -Wno-pointer-to-int-cast
   -Wno-int-to-pointer-cast
   -Wno-builtin-requires-header
   -Wno-unknown-escape-sequence
+  -include platform.h
+  -include stdio.h
 )
 
 sources=(
