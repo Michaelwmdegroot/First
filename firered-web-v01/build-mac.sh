@@ -92,6 +92,18 @@ need em++
 JOBS="$(sysctl -n hw.logicalcpu 2>/dev/null || printf '2')"
 case "$JOBS" in ''|*[!0-9]*) JOBS=2 ;; esac
 
+# pokefirered-pc-port's desktop Makefile is Windows-oriented and evaluates
+# i686-w64-mingw32-gcc even for map/graphics-only targets. The browser build
+# does not need that cross-compiler. Override the unused desktop compiler/link
+# variables whenever we ask Make to generate assets on macOS.
+MAC_MAKE_ARGS=(
+  MODERNCC=clang
+  CC1=true
+  LIBPATH=
+  LIB=
+  'CPP=clang -E'
+)
+
 section "Pinned source checkouts"
 rm -rf "$WORK"
 mkdir -p "$WORK" "$STAGE"
@@ -104,7 +116,7 @@ section "Build FireRed preprocessing tools"
 make -C "$FIRE" -f make_tools.mk -j"$JOBS"
 
 section "Generate FireRed map metadata"
-make -C "$FIRE" generated NODEP=1 SETUP_PREREQS=0
+make -C "$FIRE" "${MAC_MAKE_ARGS[@]}" generated NODEP=1 SETUP_PREREQS=0
 (
   cd "$FIRE"
   tools/mapjson/mapjson layouts firered data/layouts/layouts.json data/layouts include/constants >/dev/null
@@ -160,7 +172,7 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 s = s.replace("['make', 'NODEP=1', 'SETUP_PREREQS=1', target]",
-              "['make', 'NODEP=1', 'SETUP_PREREQS=0', target]")
+              "['make', 'NODEP=1', 'SETUP_PREREQS=0', 'MODERNCC=clang', 'CC1=true', 'LIBPATH=', 'LIB=', 'CPP=clang -E', target]")
 p.write_text(s)
 PY
 
