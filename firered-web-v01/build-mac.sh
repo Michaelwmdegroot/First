@@ -202,7 +202,9 @@ COMMON_DEFS=(
 
 COMMON_INC=(
   -Ibuild/web
-  -Iinclude
+  # FireRed has its own include/strings.h. Keep project headers quote-only so
+  # Emscripten's <string.h>/<strings.h> resolve to the sysroot, not FireRed's
+  # game text declaration header.
   -iquote include
 )
 
