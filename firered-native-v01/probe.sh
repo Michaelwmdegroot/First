@@ -54,6 +54,18 @@ mkdir -p "$FIRE/include/wasm" "$FIRE/build/wasm" "$FIRE/build/assets"
 cp "$EMERALD/include/wasm/string.h" "$FIRE/include/wasm/string.h"
 cp "$EMERALD/include/wasm/stdio.h" "$FIRE/include/wasm/stdio.h"
 cp "$EMERALD/include/wasm/stdlib.h" "$FIRE/include/wasm/stdlib.h"
+
+say ""
+say "=== Generate C-embedded graphics/font assets ==="
+cp "$EMERALD/tools/generate_wasm_assets.py" "$FIRE/tools/generate_wasm_assets.py"
+if (cd "$FIRE" && python3 tools/generate_wasm_assets.py) >>"$LOG" 2>&1; then
+  say "wasm-assets: PASS"
+else
+  say "wasm-assets: FAIL"
+  tail -n 100 "$LOG"
+  exit 1
+fi
+
 cat >> "$FIRE/include/wasm/stdio.h" <<'EOF'
 int printf(const char *format, ...);
 int puts(const char *s);
