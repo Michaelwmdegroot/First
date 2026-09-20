@@ -81,6 +81,9 @@ FLAGS=(
   -Wno-int-to-pointer-cast
   -Wno-builtin-requires-header
   -Wno-unknown-escape-sequence
+)
+
+PREINCLUDE=(
   -include platform.h
   -include stdio.h
 )
@@ -109,7 +112,7 @@ for src in "${sources[@]}"; do
   say ""
   say "--- $src ---"
 
-  if clang "${FLAGS[@]}" -E "$src" 2>>"$err" \
+  if clang "${FLAGS[@]}" "${PREINCLUDE[@]}" -E "$src" 2>>"$err" \
       | tools/preproc/preproc -i "$src" charmap.txt 2>>"$err" \
       | clang "${FLAGS[@]}" -x c -O0 -c - -o "$out" 2>>"$err"; then
     say "PASS $src"
