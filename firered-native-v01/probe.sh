@@ -124,16 +124,59 @@ for src in "${sources[@]}"; do
   fi
 done
 
+say ""
+say "=== Whole FireRed C-source wasm32 sweep ==="
+
+mkdir -p "$WORK/all-obj"
+all_pass=0
+all_fail=0
+failed_list="$WORK/failed-sources.txt"
+: > "$failed_list"
+
+while IFS= read -r src; do
+  # SDL is the desktop host we are deliberately replacing in the browser build.
+  [[ "$src" == "src/platform/sdl2.c" ]] && continue
+
+  rel="${src#src/}"
+  out="$WORK/all-obj/${rel%.c}.o"
+  err="$WORK/all-obj/${rel%.c}.err"
+  mkdir -p "$(dirname "$out")"
+  : > "$err"
+
+  if clang "${FLAGS[@]}" "${PREINCLUDE[@]}" -E "$src" 2>>"$err" \
+      | tools/preproc/preproc -i "$src" charmap.txt 2>>"$err" \
+      | clang "${FLAGS[@]}" -x c -O0 -c - -o "$out" 2>>"$err"; then
+    all_pass=$((all_pass + 1))
+  else
+    all_fail=$((all_fail + 1))
+    printf '%s\n' "$src" >> "$failed_list"
+    say ""
+    say "FAIL $src"
+    sed -n '1,45p' "$err" | tee -a "$LOG"
+  fi
+done < <(find src -type f -name '*.c' | sort)
+
+say ""
+say "=== Whole-source result ==="
+say "PASS=$all_pass"
+say "FAIL=$all_fail"
+if [[ -s "$failed_list" ]]; then
+  say "Failed sources:"
+  cat "$failed_list" | tee -a "$LOG"
+fi
+
 cd "$ROOT"
 
 say ""
 say "=== Result ==="
-say "PASS=$pass"
-say "FAIL=$fail"
+say "CORE_PASS=$pass"
+say "CORE_FAIL=$fail"
+say "ALL_C_PASS=$all_pass"
+say "ALL_C_FAIL=$all_fail"
 
 if [[ "$pass" -eq 0 ]]; then
   exit 2
 fi
 
-# Compile failures are expected in this discovery step. The log is the deliverable.
+# The sweep is discovery: remaining full-engine failures are recorded but do not fail the job yet.
 exit 0
