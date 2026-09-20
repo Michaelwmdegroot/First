@@ -1,20 +1,10 @@
 name: FireRed Web V0.1
 
 on:
-  push:
-    branches:
-      - feature/firered-web-v01
-    paths:
-      - 'firered-web-v01/**'
-      - '.github/workflows/firered-web-v01.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: firered-web-v01
-  cancel-in-progress: true
 
 jobs:
   emscripten-probe:
