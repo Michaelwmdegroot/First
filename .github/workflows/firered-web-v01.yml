@@ -7,12 +7,6 @@ on:
     paths:
       - 'firered-web-v01/**'
       - '.github/workflows/firered-web-v01.yml'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'firered-web-v01/**'
-      - '.github/workflows/firered-web-v01.yml'
   workflow_dispatch:
 
 permissions:
