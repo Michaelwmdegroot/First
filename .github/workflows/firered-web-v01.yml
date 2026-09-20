@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: firered-web-v01
+  cancel-in-progress: true
+
 jobs:
   emscripten-probe:
     runs-on: ubuntu-latest
