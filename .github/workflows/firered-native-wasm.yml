@@ -1,0 +1,55 @@
+name: FireRed native WASM
+
+on:
+  push:
+    branches:
+      - feature/firered-native-wasm-v01
+    paths:
+      - "firered-native/build.sh"
+      - "firered-native/tools/**"
+      - ".github/workflows/firered-native-wasm.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          ref: feature/firered-native-wasm-v01
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y             build-essential             clang             lld             git             python3             libpng-dev             zlib1g-dev             pkg-config
+
+      - name: Build browser-native FireRed
+        run: |
+          chmod +x firered-native/build.sh
+          ./firered-native/build.sh
+
+      - name: Upload compiled WASM
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokefirered-native-wasm
+          path: firered-native/dist/pokefirered.wasm
+          if-no-files-found: error
+
+      - name: Commit compiled browser build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add firered-native/dist/pokefirered.wasm
+          if git diff --cached --quiet; then
+            echo "Compiled WASM unchanged."
+          else
+            git commit -m "Build FireRed native WASM [skip ci]"
+            git push origin HEAD:feature/firered-native-wasm-v01
+          fi
