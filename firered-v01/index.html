@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#b91c1c" />
+  <title>Personal FireRed — V0.1</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section id="launcher" class="launcher" aria-labelledby="title">
+      <div class="brand-row">
+        <div class="pokeball" aria-hidden="true"><span></span></div>
+        <div>
+          <p class="eyebrow">PERSONAL PROJECT · V0.1</p>
+          <h1 id="title">FireRed Browser Build</h1>
+        </div>
+      </div>
+
+      <p class="intro">
+        Load your own FireRed <strong>.gba</strong> file from this device. The ROM stays local to your browser session; it is not uploaded by this page.
+      </p>
+
+      <div id="protocolWarning" class="notice warning" hidden>
+        This page is opened as a local file. For reliable WebAssembly loading, start it through the included local web server instead.
+      </div>
+
+      <label class="rom-picker" for="romInput">
+        <span class="rom-picker-title">Choose FireRed ROM</span>
+        <span class="rom-picker-subtitle">Expected base: Pokémon FireRed (USA/Europe) v1.0 · BPRE</span>
+      </label>
+      <input id="romInput" class="visually-hidden" type="file" accept=".gba,application/octet-stream" />
+
+      <div id="dropZone" class="drop-zone" aria-hidden="true">or drop the .gba file here</div>
+
+      <div id="romStatus" class="status" aria-live="polite">
+        <span class="status-dot idle" aria-hidden="true"></span>
+        <span>Select the ROM to begin.</span>
+      </div>
+
+      <div class="compat-grid" aria-label="V0.1 compatibility">
+        <div><strong>Laptop</strong><span>Keyboard + controller</span></div>
+        <div><strong>Phone</strong><span>Touch controls</span></div>
+        <div><strong>Saves</strong><span>Stored in this browser</span></div>
+      </div>
+
+      <details class="controls-help">
+        <summary>Desktop controls</summary>
+        <p>EmulatorJS provides configurable controls inside its menu. Arrow keys handle movement; you can remap A, B, Start, Select, L and R or use a connected gamepad.</p>
+      </details>
+    </section>
+
+    <section id="playArea" class="play-area" hidden aria-label="Game emulator">
+      <div class="game-header">
+        <div>
+          <p class="eyebrow">PERSONAL FIRERED · V0.1</p>
+          <strong id="loadedRomName">FireRed</strong>
+        </div>
+        <button id="reloadButton" type="button" class="secondary-button">Change ROM</button>
+      </div>
+      <div class="screen-frame">
+        <div id="game"></div>
+      </div>
+      <p class="mobile-note">On a phone, rotate to landscape if you want a larger play area. The emulator supplies its own touch controls.</p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
