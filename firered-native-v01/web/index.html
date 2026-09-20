@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#111318">
+  <title>FireRed — V0.1</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="game" aria-label="FireRed game">
+      <canvas id="screen" width="240" height="160" aria-label="FireRed game screen"></canvas>
+      <div id="status" class="status" role="status">Starting FireRed…</div>
+    </section>
+
+    <section class="controls" aria-label="Game controls">
+      <div class="dpad" aria-label="D-pad">
+        <button type="button" data-key="up" class="up" aria-label="Up">▲</button>
+        <button type="button" data-key="left" class="left" aria-label="Left">◀</button>
+        <button type="button" data-key="right" class="right" aria-label="Right">▶</button>
+        <button type="button" data-key="down" class="down" aria-label="Down">▼</button>
+      </div>
+
+      <div class="center-buttons">
+        <button type="button" data-key="select">SELECT</button>
+        <button type="button" data-key="start">START</button>
+      </div>
+
+      <div class="actions" aria-label="Action buttons">
+        <button type="button" data-key="b" class="b">B</button>
+        <button type="button" data-key="a" class="a">A</button>
+      </div>
+
+      <button type="button" data-key="l" class="shoulder l">L</button>
+      <button type="button" data-key="r" class="shoulder r">R</button>
+    </section>
+
+    <p class="desktop-help">Keyboard: arrows · Z = A · X = B · Enter = Start · Shift = Select · A/S = L/R</p>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
