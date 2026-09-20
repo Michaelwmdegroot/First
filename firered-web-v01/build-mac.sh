@@ -115,6 +115,11 @@ printf 'Emerald WASM:  %s\n' "$(git -C "$EMERALD" rev-parse HEAD)"
 section "Build FireRed preprocessing tools"
 make -C "$FIRE" -f make_tools.mk -j"$JOBS"
 
+section "Build WASM-aware C preprocessor"
+make -C "$EMERALD/tools/preproc" -j"$JOBS"
+WEB_PREPROC="$EMERALD/tools/preproc/preproc"
+test -x "$WEB_PREPROC" || fail "WASM-aware preprocessor was not built."
+
 section "Generate FireRed map metadata"
 make -C "$FIRE" "${MAC_MAKE_ARGS[@]}" generated NODEP=1 SETUP_PREREQS=0
 (
@@ -226,7 +231,7 @@ compile_game_c() {
   mkdir -p "$(dirname "$out")"
   printf 'CC %s\n' "$src"
   emcc "${COMMON_DEFS[@]}" "${COMMON_INC[@]}" -E "$src" \
-    | tools/preproc/preproc -i -g build/assets "$src" charmap.txt \
+    | "$WEB_PREPROC" -i -g build/assets "$src" charmap.txt \
     | emcc "${COMMON_DEFS[@]}" "${COMMON_INC[@]}" -x c -std=gnu11 -O2 \
         "${WARNINGS[@]}" -c - -o "$out"
 }
