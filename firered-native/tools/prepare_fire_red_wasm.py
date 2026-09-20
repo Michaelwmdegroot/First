@@ -19,7 +19,7 @@ def patch_main() -> None:
         else:
             text = include + text
 
-    signature = re.search(r"(?m)^void\\s+AgbMain\\s*\\([^)]*\\)\\s*$", text)
+    signature = re.search(r"(?m)^void\s+AgbMain\s*\([^)]*\)\s*$", text)
     if not signature:
         raise RuntimeError("Could not find AgbMain startup function")
     start = signature.start()
