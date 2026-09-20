@@ -1,0 +1,54 @@
+name: FireRed Web V0.1
+
+on:
+  push:
+    branches:
+      - feature/firered-web-v01
+    paths:
+      - 'firered-web-v01/**'
+      - '.github/workflows/firered-web-v01.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  emscripten-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout build lane
+        uses: actions/checkout@v4
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git python3 libpng-dev
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+
+      - name: Verify Emscripten
+        run: |
+          emcc --version
+          em++ --version
+
+      - name: Probe native FireRed code as WebAssembly
+        run: bash firered-web-v01/probe.sh
+
+      - name: Show result
+        if: always()
+        run: |
+          test -f firered-web-v01/probe.log && tail -n 180 firered-web-v01/probe.log || true
+
+      - name: Upload probe log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firered-web-v01-probe
+          path: firered-web-v01/probe.log
+          if-no-files-found: warn
