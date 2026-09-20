@@ -133,6 +133,7 @@ done
 say ""
 say "=== Emerald WASM data converter against FireRed ==="
 cp "$EMERALD/tools/wasm_asm_data.py" tools/wasm_asm_data.py
+python3 "$ROOT/firered-web-v01/prepare_converter.py" tools/wasm_asm_data.py
 chmod +x tools/wasm_asm_data.py
 
 data_sources=(
@@ -144,6 +145,9 @@ data_sources=(
   data/battle_ai_scripts.s
   data/battle_anim_scripts.s
   data/field_effect_scripts.s
+  data/mystery_event_msg.s
+  data/mystery_event_script_cmd_table.s
+  data/sound_data.s
 )
 data_pass=0
 data_fail=0
@@ -156,6 +160,7 @@ for src in "${data_sources[@]}"; do
   rm -f "$out" "$expanded" "$err"
   say "--- $src ---"
   if python3 tools/wasm_asm_data.py "$src" "$expanded" 2>>"$err" \
+      && python3 "$ROOT/firered-web-v01/normalize_wasm_asm.py" "$expanded" 2>>"$err" \
       && emcc -c -x assembler "$expanded" -o "$out" 2>>"$err"
   then
     say "PASS $src"
