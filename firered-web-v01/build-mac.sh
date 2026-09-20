@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG="$HERE/build-mac.log"
+WORK="${FIRERED_WEB_WORK:-${TMPDIR:-/tmp}/personal-firered-web-v01}"
+FIRE="$WORK/pokefirered-pc-port"
+EMERALD="$WORK/pokeemerald-wasm"
+STAGE="$WORK/output"
+OBJ="$FIRE/build/web/obj"
+BUILD="$FIRE/build/web"
+
+FIRE_REPO="https://github.com/jommg/pokefirered-pc-port.git"
+FIRE_SHA="ea42ca1672eb457ba86442093a6df3119fbcee5f"
+EMERALD_REPO="https://github.com/tripplyons/pokeemerald-wasm.git"
+EMERALD_SHA="fd83f5b6e609b61b0b10777e32c74343e1a81b41"
+
+: > "$LOG"
+exec > >(tee -a "$LOG") 2>&1
+
+fail() {
+  printf '\nERROR: %s\n' "$*" >&2
+  printf 'Build log: %s\n' "$LOG" >&2
+  exit 1
+}
+
+on_error() {
+  local line="$1"
+  printf '\nBuild stopped at line %s.\n' "$line" >&2
+  printf 'Build log: %s\n' "$LOG" >&2
+}
+trap 'on_error "$LINENO"' ERR
+
+section() {
+  printf '\n============================================================\n%s\n============================================================\n' "$*"
+}
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
+}
+
+checkout_pinned() {
+  local url="$1"
+  local sha="$2"
+  local dest="$3"
+  rm -rf "$dest"
+  mkdir -p "$dest"
+  git -C "$dest" init -q
+  git -C "$dest" remote add origin "$url"
+  git -C "$dest" fetch -q --depth=1 origin "$sha"
+  git -C "$dest" checkout -q --detach FETCH_HEAD
+  test "$(git -C "$dest" rev-parse HEAD)" = "$sha" || fail "Pinned checkout mismatch for $url"
+}
+
+section "FireRed Web V0.1 — local macOS build"
+[[ "$(uname -s)" == "Darwin" ]] || fail "This helper is intentionally for macOS."
+
+need git
+need python3
+need make
+
+if ! xcode-select -p >/dev/null 2>&1; then
+  fail "Apple Command Line Tools are missing. Run: xcode-select --install"
+fi
+
+if ! command -v brew >/dev/null 2>&1; then
+  fail "Homebrew is missing. Install it from https://brew.sh and run this command again."
+fi
+
+missing_formulae=()
+command -v emcc >/dev/null 2>&1 || missing_formulae+=(emscripten)
+command -v pkg-config >/dev/null 2>&1 || missing_formulae+=(pkg-config)
+brew list --versions libpng >/dev/null 2>&1 || missing_formulae+=(libpng)
+
+if ((${#missing_formulae[@]})); then
+  section "Install missing build dependencies"
+  # De-duplicate while preserving order.
+  unique=()
+  for formula in "${missing_formulae[@]}"; do
+    seen=0
+    for existing in "${unique[@]:-}"; do
+      [[ "$existing" == "$formula" ]] && seen=1
+    done
+    ((seen == 0)) && unique+=("$formula")
+  done
+  HOMEBREW_NO_AUTO_UPDATE=1 brew install "${unique[@]}"
+fi
+
+need emcc
+need em++
+
+JOBS="$(sysctl -n hw.logicalcpu 2>/dev/null || printf '2')"
+case "$JOBS" in ''|*[!0-9]*) JOBS=2 ;; esac
+
+section "Pinned source checkouts"
+rm -rf "$WORK"
+mkdir -p "$WORK" "$STAGE"
+checkout_pinned "$FIRE_REPO" "$FIRE_SHA" "$FIRE"
+checkout_pinned "$EMERALD_REPO" "$EMERALD_SHA" "$EMERALD"
+printf 'FireRed:       %s\n' "$(git -C "$FIRE" rev-parse HEAD)"
+printf 'Emerald WASM:  %s\n' "$(git -C "$EMERALD" rev-parse HEAD)"
+
+section "Build FireRed preprocessing tools"
+make -C "$FIRE" -f make_tools.mk -j"$JOBS"
+
+section "Generate FireRed map metadata"
+make -C "$FIRE" generated NODEP=1 SETUP_PREREQS=0
+(
+  cd "$FIRE"
+  tools/mapjson/mapjson layouts firered data/layouts/layouts.json data/layouts include/constants >/dev/null
+  tools/mapjson/mapjson groups firered data/maps/map_groups.json data/maps include/constants >/dev/null
+  while IFS= read -r mapjson; do
+    tools/mapjson/mapjson map firered "$mapjson" data/layouts/layouts.json "$(dirname "$mapjson")" >/dev/null
+  done < <(find data/maps -mindepth 2 -name map.json | sort)
+)
+
+section "Apply browser portability patches"
+python3 - "$FIRE" <<'PY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+
+p = root / "src/main.c"
+s = p.read_text()
+if '#include "platform.h"' not in s:
+    s = s.replace('#include "sloopsvc.h"\n', '#include "sloopsvc.h"\n#include "platform.h"\n')
+p.write_text(s)
+
+p = root / "src/libagbsyscall.c"
+s = p.read_text()
+if '#include <stdio.h>' not in s:
+    s = s.replace('#include "gba/flash_internal.h"\n', '#include "gba/flash_internal.h"\n#include <stdio.h>\n')
+p.write_text(s)
+
+p = root / "src/platform/dma.c"
+s = p.read_text()
+if '#include <stdint.h>' not in s:
+    s = s.replace('#include "platform/dma.h"\n', '#include "platform/dma.h"\n#include <stdint.h>\n#include <stdio.h>\n')
+s = s.replace('dma->dst = ((&REG_DMA0DAD)[dmaNum * 3]);',
+              'dma->dst = (void *)(uintptr_t)((&REG_DMA0DAD)[dmaNum * 3]);')
+s = s.replace('(&REG_DMA0SAD)[dmaNum * 3] = src;',
+              '(&REG_DMA0SAD)[dmaNum * 3] = (u32)(uintptr_t)src;')
+s = s.replace('(&REG_DMA0DAD)[dmaNum * 3] = dest;',
+              '(&REG_DMA0DAD)[dmaNum * 3] = (u32)(uintptr_t)dest;')
+p.write_text(s)
+PY
+
+section "Install pinned WASM data/asset helpers"
+cp "$EMERALD/tools/wasm_asm_data.py" "$FIRE/tools/wasm_asm_data.py"
+cp "$EMERALD/tools/generate_wasm_assets.py" "$FIRE/tools/generate_wasm_assets.py"
+python3 "$HERE/prepare_converter.py" "$FIRE/tools/wasm_asm_data.py"
+chmod +x "$FIRE/tools/wasm_asm_data.py" "$FIRE/tools/generate_wasm_assets.py"
+
+# The Emerald helper asks make to rebuild prerequisites for every generated
+# asset. FireRed's tools/maps were already generated above, so keep each asset
+# request narrow and avoid the PC-port's unrelated desktop toolchain path.
+python3 - "$FIRE/tools/generate_wasm_assets.py" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+s = s.replace("['make', 'NODEP=1', 'SETUP_PREREQS=1', target]",
+              "['make', 'NODEP=1', 'SETUP_PREREQS=0', target]")
+p.write_text(s)
+PY
+
+section "Generate graphics/data binaries used by C"
+(
+  cd "$FIRE"
+  python3 tools/generate_wasm_assets.py
+)
+
+mkdir -p "$OBJ" "$BUILD/data"
+
+COMMON_DEFS=(
+  -DFIRERED=1
+  -DREVISION=0
+  -DENGLISH=1
+  -DPORTABLE
+  -DNONMATCHING
+  -DUBFIX
+  -DMODERN=1
+  -DWEB=1
+)
+
+COMMON_INC=(
+  -Ibuild/web
+  -Iinclude
+  -iquote include
+)
+
+WARNINGS=(
+  -Wno-unknown-attributes
+  -Wno-ignored-attributes
+  -Wno-incompatible-library-redeclaration
+  -Wno-incompatible-pointer-types
+  -Wno-implicit-function-declaration
+  -Wno-int-conversion
+  -Wno-pointer-to-int-cast
+  -Wno-int-to-pointer-cast
+  -Wno-builtin-requires-header
+  -Wno-gnu-alignof-expression
+  -Wno-unknown-escape-sequence
+  -Wno-excess-initializers
+  -Wno-unused-function
+  -Wno-unused-variable
+  -Wno-unused-value
+)
+
+compile_game_c() {
+  local src="$1"
+  local rel="${src#src/}"
+  local out="$OBJ/${rel%.c}.o"
+  mkdir -p "$(dirname "$out")"
+  printf 'CC %s\n' "$src"
+  emcc "${COMMON_DEFS[@]}" "${COMMON_INC[@]}" -E "$src" \
+    | tools/preproc/preproc -i -g build/assets "$src" charmap.txt \
+    | emcc "${COMMON_DEFS[@]}" "${COMMON_INC[@]}" -x c -std=gnu11 -O2 \
+        "${WARNINGS[@]}" -c - -o "$out"
+}
+
+section "Compile full FireRed C engine to WebAssembly objects"
+(
+  cd "$FIRE"
+  while IFS= read -r src; do
+    case "$src" in
+      *.inc.c) continue ;;
+      src/platform/sdl2.c) continue ;;
+      src/platform/cgb_audio.c) continue ;;
+      src/m4a.c) continue ;;
+      src/sound.c) continue ;;
+    esac
+    compile_game_c "$src"
+  done < <(find src -type f -name '*.c' | sort)
+)
+
+section "Compile browser host and silent V0.1 audio state layer"
+(
+  cd "$FIRE"
+  emcc "${COMMON_DEFS[@]}" "${COMMON_INC[@]}" -sUSE_SDL=3 -std=gnu11 -O2 \
+    "${WARNINGS[@]}" -c "$HERE/web.c" -o "$OBJ/platform/web_host.o"
+  emcc "${COMMON_DEFS[@]}" "${COMMON_INC[@]}" -std=gnu11 -O2 \
+    "${WARNINGS[@]}" -c "$HERE/sound_web.c" -o "$OBJ/sound_web.o"
+)
+
+DATA_SOURCES=(
+  data/maps.s
+  data/map_events.s
+  data/event_scripts.s
+  data/battle_scripts_1.s
+  data/battle_scripts_2.s
+  data/battle_ai_scripts.s
+  data/battle_anim_scripts.s
+  data/field_effect_scripts.s
+  data/mystery_event_msg.s
+  data/mystery_event_script_cmd_table.s
+  data/sound_data.s
+)
+
+section "Convert FireRed maps/events/battle data to WebAssembly objects"
+(
+  cd "$FIRE"
+  for src in "${DATA_SOURCES[@]}"; do
+    name="$(basename "$src" .s)"
+    expanded="$BUILD/data/$name.wasm.s"
+    out="$OBJ/data/$name.o"
+    mkdir -p "$(dirname "$out")"
+    printf 'DATA %s\n' "$src"
+    python3 tools/wasm_asm_data.py "$src" "$expanded"
+    python3 "$HERE/normalize_wasm_asm.py" "$expanded"
+    emcc -c -x assembler "$expanded" -o "$out"
+  done
+)
+
+section "Link browser build"
+OBJECTS=()
+while IFS= read -r object; do
+  OBJECTS+=("$object")
+done < <(find "$OBJ" -type f -name '*.o' | sort)
+((${#OBJECTS[@]} > 0)) || fail "No WebAssembly objects were produced."
+printf 'Linking %d objects.\n' "${#OBJECTS[@]}"
+
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+
+emcc "${OBJECTS[@]}" -O2 \
+  -sUSE_SDL=3 \
+  -sASYNCIFY=1 \
+  -sFORCE_FILESYSTEM=1 \
+  -sALLOW_MEMORY_GROWTH=1 \
+  -sINITIAL_MEMORY=268435456 \
+  -sSTACK_SIZE=5242880 \
+  -sNO_EXIT_RUNTIME=1 \
+  -sASSERTIONS=1 \
+  -sENVIRONMENT=web \
+  -sEXPORTED_FUNCTIONS='["_main","_WebSetKeys","_WebFlushSave","_WebUnlockAudio"]' \
+  -sEXPORTED_RUNTIME_METHODS='["FS"]' \
+  -lidbfs.js \
+  --pre-js "$HERE/pre.js" \
+  -o "$STAGE/game.js"
+
+test -s "$STAGE/game.js" || fail "Emscripten did not produce game.js"
+test -s "$STAGE/game.wasm" || fail "Emscripten did not produce game.wasm"
+
+section "Publish compiled files into firered-web-v01"
+cp "$STAGE/game.js" "$HERE/game.js"
+cp "$STAGE/game.wasm" "$HERE/game.wasm"
+
+printf '\nSUCCESS\n'
+printf '  %s (%s)\n' "$HERE/game.js" "$(du -h "$HERE/game.js" | awk '{print $1}')"
+printf '  %s (%s)\n' "$HERE/game.wasm" "$(du -h "$HERE/game.wasm" | awk '{print $1}')"
+printf '\nLocal test:\n'
+printf '  cd %q && python3 -m http.server 8080\n' "$HERE"
+printf '  then open http://localhost:8080/\n'
+printf '\nNo GitHub Actions workflow was used.\n'
