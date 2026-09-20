@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b0b0d">
+  <title>FireRed · Personal Build</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="game-shell" id="gameShell">
+    <section class="screen-wrap" aria-label="FireRed game">
+      <div class="screen-stage">
+        <canvas id="screen" width="240" height="160" aria-label="Pokémon FireRed"></canvas>
+        <div id="bootOverlay" class="boot-overlay">
+          <div class="ball" aria-hidden="true"><span></span></div>
+          <strong>Starting FireRed</strong>
+          <span id="status">Loading native game build…</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="controls" aria-label="Game controls">
+      <div class="dpad" aria-label="Directional pad">
+        <button type="button" data-key="up" class="up" aria-label="Up">▲</button>
+        <button type="button" data-key="left" class="left" aria-label="Left">◀</button>
+        <button type="button" data-key="right" class="right" aria-label="Right">▶</button>
+        <button type="button" data-key="down" class="down" aria-label="Down">▼</button>
+        <span class="dpad-center" aria-hidden="true"></span>
+      </div>
+
+      <div class="middle-buttons">
+        <button type="button" data-key="select">SELECT</button>
+        <button type="button" data-key="start">START</button>
+      </div>
+
+      <div class="action-buttons" aria-label="Action buttons">
+        <button type="button" data-key="b" class="round b">B</button>
+        <button type="button" data-key="a" class="round a">A</button>
+      </div>
+    </section>
+
+    <div class="shoulders">
+      <button type="button" data-key="l">L</button>
+      <p>Personal FireRed · native browser build</p>
+      <button type="button" data-key="r">R</button>
+    </div>
+
+    <p class="desktop-help">Desktop: arrows · Z = A · X = B · Enter = Start · Backspace = Select · A/S = L/R</p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
