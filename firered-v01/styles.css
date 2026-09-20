@@ -1,0 +1,195 @@
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0b;
+  --panel: #151518;
+  --panel-2: #1d1d21;
+  --text: #f8f8fa;
+  --muted: #a6a6af;
+  --line: #2e2e35;
+  --red: #dc2626;
+  --red-dark: #991b1b;
+  --green: #34d399;
+  --amber: #fbbf24;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(220, 38, 38, .2), transparent 36rem),
+    var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+button, input { font: inherit; }
+
+.app-shell {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: max(22px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(30px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.launcher {
+  width: min(100%, 680px);
+  margin: clamp(18px, 8vw, 86px) auto 0;
+  padding: clamp(22px, 5vw, 40px);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(29,29,33,.98), rgba(17,17,20,.98));
+  box-shadow: 0 24px 80px rgba(0,0,0,.34);
+}
+
+.brand-row { display: flex; align-items: center; gap: 16px; }
+.eyebrow {
+  margin: 0 0 5px;
+  color: #d2d2d8;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+h1 { margin: 0; font-size: clamp(28px, 7vw, 46px); line-height: 1.02; letter-spacing: -.04em; }
+.intro { margin: 25px 0; color: #d0d0d7; line-height: 1.65; }
+
+.pokeball {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  border: 4px solid #f5f5f5;
+  border-radius: 50%;
+  background: linear-gradient(to bottom, var(--red) 0 46%, #111 46% 54%, #f3f4f6 54% 100%);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.4);
+}
+.pokeball span {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 17px;
+  height: 17px;
+  transform: translate(-50%, -50%);
+  border: 4px solid #111;
+  border-radius: 50%;
+  background: #fafafa;
+}
+
+.rom-picker {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  padding: 16px 18px;
+  border: 1px solid #ef4444;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #dc2626, #b91c1c);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .16s ease, filter .16s ease;
+}
+.rom-picker-title { display: block; font-size: 18px; font-weight: 850; }
+.rom-picker-subtitle { display: block; margin-top: 4px; font-size: 12px; color: #fee2e2; line-height: 1.4; }
+@media (hover: hover) and (pointer: fine) {
+  .rom-picker:hover { transform: translateY(-1px); filter: brightness(1.07); }
+}
+
+.drop-zone {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed #45454f;
+  border-radius: 14px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+}
+.drop-zone.dragging { border-color: #f87171; color: #fecaca; background: rgba(220,38,38,.08); }
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #111114;
+  color: #d5d5dc;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.status-dot { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: #73737e; }
+.status-dot.good { background: var(--green); box-shadow: 0 0 12px rgba(52,211,153,.55); }
+.status-dot.warning { background: var(--amber); }
+.status-dot.loading { background: #60a5fa; animation: pulse 1s ease-in-out infinite alternate; }
+@keyframes pulse { to { opacity: .35; } }
+
+.compat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 22px;
+}
+.compat-grid div { padding: 14px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--line); }
+.compat-grid strong, .compat-grid span { display: block; }
+.compat-grid strong { font-size: 13px; }
+.compat-grid span { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+
+.notice { margin: 18px 0; padding: 12px 14px; border-radius: 13px; font-size: 13px; line-height: 1.5; }
+.notice.warning { border: 1px solid rgba(251,191,36,.35); background: rgba(251,191,36,.08); color: #fde68a; }
+.controls-help { margin-top: 18px; color: var(--muted); font-size: 13px; }
+.controls-help summary { cursor: pointer; color: #dedee5; font-weight: 700; }
+.controls-help p { line-height: 1.55; }
+
+.play-area { width: 100%; }
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.game-header strong { display: block; max-width: 62vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.secondary-button {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+.screen-frame {
+  overflow: hidden;
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #000;
+}
+#game { width: 100%; min-height: 320px; }
+.mobile-note { margin: 12px 2px 0; color: var(--muted); font-size: 12px; line-height: 1.5; text-align: center; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@media (max-width: 620px) {
+  .app-shell { padding-left: 12px; padding-right: 12px; }
+  .launcher { margin-top: 12px; border-radius: 22px; }
+  .compat-grid { grid-template-columns: 1fr; }
+  .compat-grid div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .compat-grid span { margin-top: 0; text-align: right; }
+  .game-header { align-items: flex-end; }
+  .screen-frame, #game { min-height: 240px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
