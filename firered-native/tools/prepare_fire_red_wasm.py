@@ -19,7 +19,12 @@ def patch_main() -> None:
         else:
             text = include + text
 
-    signature = re.search(r"(?m)^void\\s+AgbMain\\s*\\([^)]*\\)\\s*$", text)\n    if not signature:\n        raise RuntimeError("Could not find AgbMain startup function")\n    start = signature.start()\n    open_brace = text.index("{", signature.end())\n    depth = 0
+    signature = re.search(r"(?m)^void\\s+AgbMain\\s*\\([^)]*\\)\\s*$", text)
+    if not signature:
+        raise RuntimeError("Could not find AgbMain startup function")
+    start = signature.start()
+    open_brace = text.index("{", signature.end())
+    depth = 0
     end = None
     for i in range(open_brace, len(text)):
         if text[i] == "{":
