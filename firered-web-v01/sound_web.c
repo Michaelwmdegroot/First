@@ -219,8 +219,6 @@ void MPlayOpen(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track
     }
 }
 void MPlayExtender(struct CgbChannel *cgbChans) { (void)cgbChans; }
-void MPlayJumpTableCopy(void **mplayJumpTable) { (void)mplayJumpTable; }
-
 void SoundInit(struct SoundInfo *soundInfo)
 {
     if (soundInfo != NULL)
@@ -228,13 +226,6 @@ void SoundInit(struct SoundInfo *soundInfo)
         memset(soundInfo, 0, sizeof(*soundInfo));
         soundInfo->ident = ID_NUMBER;
     }
-}
-void SoundMain(void) {}
-void SoundMainBTM(void *ptr) { (void)ptr; }
-void TrackStop(struct MusicPlayerInfo *player, struct MusicPlayerTrack *track)
-{
-    (void)track;
-    StopPlayer(player);
 }
 void FadeOutBody(struct MusicPlayerInfo *mplayInfo) { StopPlayer(mplayInfo); }
 void TrkVolPitSet(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track)
@@ -258,11 +249,6 @@ u32 MidiKeyToFreq(struct WaveData *wav, u8 key, u8 fineAdjust)
 }
 void DummyFunc(void) {}
 void SampleFreqSet(u32 freq) { (void)freq; }
-u32 umul3232H32(u32 multiplier, u32 multiplicand)
-{
-    return (u32)(((u64)multiplier * multiplicand) >> 32);
-}
-
 void InitMapMusic(void)
 {
     sCurrentMapMusic = 0;
