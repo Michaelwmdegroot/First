@@ -9,6 +9,112 @@ if len(sys.argv) != 2:
 path = Path(sys.argv[1])
 text = path.read_text()
 
+# pokeemerald-wasm's converter expects data/script_cmd_table.inc to use
+# "script_cmd_table_entry SCR_OP_* ScrCmd_*". This FireRed base predates that
+# representation and stores the same command table as raw ".4byte ScrCmd_*"
+# entries with the opcode in the trailing comment. Teach the copied converter
+# to support both forms. We derive every SCR_OP_* name the converter actually
+# uses by normalising it against the FireRed ScrCmd_* function name, so this is
+# not a hand-maintained opcode list.
+script_constants_old = '''def load_script_command_constants() -> Dict[str, int]:
+    constants = {}
+    value = 0
+    table = ROOT / "data/script_cmd_table.inc"
+    for line in table.read_text().splitlines():
+        line = line.split("@", 1)[0].strip()
+        if line.startswith("script_cmd_table_entry "):
+            constants[line.split()[1]] = value
+            value += 1
+    return constants
+'''
+script_constants_new = '''def load_script_command_constants() -> Dict[str, int]:
+    constants = {}
+    value = 0
+    table = ROOT / "data/script_cmd_table.inc"
+    table_text = table.read_text()
+
+    # Newer pokeemerald-style symbolic table.
+    for line in table_text.splitlines():
+        line = line.split("@", 1)[0].strip()
+        if line.startswith("script_cmd_table_entry "):
+            constants[line.split()[1]] = value
+            value += 1
+    if constants:
+        return constants
+
+    # FireRed-style raw table, e.g.:
+    #   .4byte ScrCmd_setflag  @ 0x29
+    raw_entries = {}
+    raw_re = re.compile(
+        r"^\\s*\\.4byte\\s+(ScrCmd_[A-Za-z0-9_]+)\\s*@\\s*(0x[0-9A-Fa-f]+)\\s*$"
+    )
+    for raw in table_text.splitlines():
+        match = raw_re.match(raw)
+        if not match:
+            continue
+        function_name, opcode = match.groups()
+        key = function_name[len("ScrCmd_"):].replace("_", "").lower()
+        raw_entries[key] = int(opcode, 16)
+
+    wanted = set(re.findall(r"\\bSCR_OP_[A-Z0-9_]+\\b", Path(__file__).read_text()))
+    missing = []
+    for name in wanted:
+        key = name[len("SCR_OP_"):].replace("_", "").lower()
+        if key not in raw_entries:
+            missing.append(name)
+            continue
+        constants[name] = raw_entries[key]
+
+    if missing:
+        raise ValueError(
+            "FireRed script command table is missing converter opcodes: "
+            + ", ".join(sorted(missing))
+        )
+    if not constants:
+        raise ValueError("Could not parse FireRed script command table")
+    return constants
+'''
+if script_constants_old not in text:
+    raise SystemExit("converter script-command constants hook changed upstream; adapter needs review")
+text = text.replace(script_constants_old, script_constants_new)
+
+script_functions_old = '''def load_script_command_functions() -> List[str]:
+    functions = []
+    for line in (ROOT / "data/script_cmd_table.inc").read_text().splitlines():
+        line = line.split("@", 1)[0].strip()
+        if not line.startswith("script_cmd_table_entry "):
+            continue
+        functions.append(line.split()[2])
+    return functions
+'''
+script_functions_new = '''def load_script_command_functions() -> List[str]:
+    functions = []
+    table_text = (ROOT / "data/script_cmd_table.inc").read_text()
+
+    for line in table_text.splitlines():
+        line = line.split("@", 1)[0].strip()
+        if not line.startswith("script_cmd_table_entry "):
+            continue
+        functions.append(line.split()[2])
+    if functions:
+        return functions
+
+    # FireRed's raw command table includes the opcode as a comment on every
+    # real table entry. Requiring that comment also avoids the sentinel
+    # gScriptCmdTableEnd entry.
+    raw_re = re.compile(
+        r"^\\s*\\.4byte\\s+(ScrCmd_[A-Za-z0-9_]+)\\s*@\\s*0x[0-9A-Fa-f]+\\s*$"
+    )
+    for raw in table_text.splitlines():
+        match = raw_re.match(raw)
+        if match:
+            functions.append(match.group(1))
+    return functions
+'''
+if script_functions_old not in text:
+    raise SystemExit("converter script-command functions hook changed upstream; adapter needs review")
+text = text.replace(script_functions_old, script_functions_new)
+
 needle = '''    for raw in (ROOT / "include/constants/tms_hms.h").read_text().splitlines():
 '''
 replacement = '''    tm_hm_path = ROOT / "include/constants/tms_hms.h"
