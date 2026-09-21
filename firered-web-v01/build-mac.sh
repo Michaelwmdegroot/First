@@ -265,6 +265,35 @@ compile_game_c() {
         "${WARNINGS[@]}" -c - -o "$out"
 }
 
+DATA_SOURCES=(
+  data/maps.s
+  data/map_events.s
+  data/event_scripts.s
+  data/battle_scripts_1.s
+  data/battle_scripts_2.s
+  data/battle_ai_scripts.s
+  data/battle_anim_scripts.s
+  data/field_effect_scripts.s
+  data/mystery_event_msg.s
+  data/mystery_event_script_cmd_table.s
+  data/sound_data.s
+)
+
+section "Preflight FireRed maps/events/battle data as WebAssembly objects"
+(
+  cd "$FIRE"
+  for src in "${DATA_SOURCES[@]}"; do
+    name="$(basename "$src" .s)"
+    expanded="$BUILD/data/$name.wasm.s"
+    out="$OBJ/data/$name.o"
+    mkdir -p "$(dirname "$out")"
+    printf 'DATA %s\n' "$src"
+    python3 tools/wasm_asm_data.py "$src" "$expanded"
+    python3 "$HERE/normalize_wasm_asm.py" "$expanded"
+    emcc -c -x assembler "$expanded" -o "$out"
+  done
+)
+
 section "Compile full FireRed C engine to WebAssembly objects"
 (
   cd "$FIRE"
@@ -287,35 +316,6 @@ section "Compile browser host and silent V0.1 audio state layer"
     "${WARNINGS[@]}" -c "$HERE/web.c" -o "$OBJ/platform/web_host.o"
   emcc "${COMMON_DEFS[@]}" "${COMMON_INC[@]}" -std=gnu11 -O2 \
     "${WARNINGS[@]}" -c "$HERE/sound_web.c" -o "$OBJ/sound_web.o"
-)
-
-DATA_SOURCES=(
-  data/maps.s
-  data/map_events.s
-  data/event_scripts.s
-  data/battle_scripts_1.s
-  data/battle_scripts_2.s
-  data/battle_ai_scripts.s
-  data/battle_anim_scripts.s
-  data/field_effect_scripts.s
-  data/mystery_event_msg.s
-  data/mystery_event_script_cmd_table.s
-  data/sound_data.s
-)
-
-section "Convert FireRed maps/events/battle data to WebAssembly objects"
-(
-  cd "$FIRE"
-  for src in "${DATA_SOURCES[@]}"; do
-    name="$(basename "$src" .s)"
-    expanded="$BUILD/data/$name.wasm.s"
-    out="$OBJ/data/$name.o"
-    mkdir -p "$(dirname "$out")"
-    printf 'DATA %s\n' "$src"
-    python3 tools/wasm_asm_data.py "$src" "$expanded"
-    python3 "$HERE/normalize_wasm_asm.py" "$expanded"
-    emcc -c -x assembler "$expanded" -o "$out"
-  done
 )
 
 section "Link browser build"
