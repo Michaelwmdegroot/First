@@ -615,7 +615,7 @@ printf 'Linking %d objects.\n' "${#OBJECTS[@]}"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 
-emcc "${OBJECTS[@]}" -O2 \
+emcc "${OBJECTS[@]}" -O2 -g2 \
   -sUSE_SDL=3 \
   -sASYNCIFY=1 \
   -sFORCE_FILESYSTEM=1 \
@@ -623,7 +623,7 @@ emcc "${OBJECTS[@]}" -O2 \
   -sINITIAL_MEMORY=268435456 \
   -sSTACK_SIZE=5242880 \
   -sNO_EXIT_RUNTIME=1 \
-  -sASSERTIONS=1 \
+  -sASSERTIONS=2 \
   -sENVIRONMENT=web \
   -sEXPORTED_FUNCTIONS='["_main","_WebSetKeys","_WebFlushSave","_WebUnlockAudio"]' \
   -sEXPORTED_RUNTIME_METHODS='["FS"]' \
