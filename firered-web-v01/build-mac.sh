@@ -241,6 +241,41 @@ section "Generate graphics/data binaries used by C"
   python3 tools/generate_wasm_assets.py
 )
 
+# The Emerald WASM asset helper scans C-style INCBIN_U* macros, but FireRed's
+# sound samples are referenced by raw assembly .incbin directives in
+# sound/direct_sound_data.inc. Build those binaries explicitly with FireRed's
+# own audio_rules.mk / wav2agb pipeline before the WASM assembler sees them.
+section "Generate FireRed direct-sound binaries"
+(
+  cd "$FIRE"
+  SOUND_BIN_TARGETS=()
+  while IFS= read -r target; do
+    SOUND_BIN_TARGETS+=("$target")
+  done < <(
+    python3 - <<'PY'
+from pathlib import Path
+import re
+
+text = Path("sound/direct_sound_data.inc").read_text()
+targets = re.findall(r'\.incbin\s+"([^"]+\.bin)"', text)
+if len(targets) != 477:
+    raise SystemExit(f"Expected 477 FireRed direct-sound .incbin targets, found {len(targets)}")
+
+for target in targets:
+    source = Path(target).with_suffix(".wav")
+    if not source.exists():
+        raise SystemExit(f"Missing FireRed WAV source for {target}: {source}")
+    print(target)
+PY
+  )
+
+  if [ "${#SOUND_BIN_TARGETS[@]}" -ne 477 ]; then
+    fail "Expected 477 FireRed direct-sound targets."
+  fi
+
+  make -j"$JOBS" "${MAC_MAKE_ARGS[@]}" NODEP=1 SETUP_PREREQS=0 "${SOUND_BIN_TARGETS[@]}"
+)
+
 mkdir -p "$OBJ" "$BUILD/data"
 
 COMMON_DEFS=(
