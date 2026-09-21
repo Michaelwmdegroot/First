@@ -349,6 +349,32 @@ p.write_text(s)
 # prologue/epilogue requirement, and Clang rejects C statements in naked
 # functions. Keep the behavior and remove only those three matching markers in
 # the temporary build checkout.
+# Add WEB-only save checkpoints around the classic FireRed sector writer.
+p = root / "src/save.c"
+s = p.read_text()
+decl_anchor = '#include "sloopsvc.h"\n'
+decl = '#ifdef WEB\nvoid WebSaveCheckpoint(unsigned int sector, const char *stage);\n#endif\n'
+if decl not in s:
+    if s.count(decl_anchor) != 1:
+        raise RuntimeError("save.c include anchor changed")
+    s = s.replace(decl_anchor, decl_anchor + decl, 1)
+
+sector_old = '''        for (i = 0; i < NUM_SECTORS_PER_SLOT; i++)
+            HandleWriteSector(i, locations);
+'''
+sector_new = '''        for (i = 0; i < NUM_SECTORS_PER_SLOT; i++)
+        {
+#ifdef WEB
+            WebSaveCheckpoint(i, "sector");
+#endif
+            HandleWriteSector(i, locations);
+        }
+'''
+if s.count(sector_old) != 1:
+    raise RuntimeError(f"Expected one full save sector loop, found {s.count(sector_old)}")
+s = s.replace(sector_old, sector_new, 1)
+p.write_text(s)
+
 p = root / "src/librfu_intr.c"
 s = p.read_text()
 naked_count = s.count("\nNAKED\n")
