@@ -1,0 +1,438 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import re
+import sys
+
+if len(sys.argv) != 2:
+    raise SystemExit("usage: prepare_converter.py PATH_TO_COPIED_CONVERTER")
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+# pokeemerald-wasm's converter expects data/script_cmd_table.inc to use
+# "script_cmd_table_entry SCR_OP_* ScrCmd_*". This FireRed base predates that
+# representation and stores the same command table as raw ".4byte ScrCmd_*"
+# entries with the opcode in the trailing comment. Teach the copied converter
+# to support both forms. We derive every SCR_OP_* name the converter actually
+# uses by normalising it against the FireRed ScrCmd_* function name, so this is
+# not a hand-maintained opcode list.
+script_constants_old = '''def load_script_command_constants() -> Dict[str, int]:
+    constants = {}
+    value = 0
+    table = ROOT / "data/script_cmd_table.inc"
+    for line in table.read_text().splitlines():
+        line = line.split("@", 1)[0].strip()
+        if line.startswith("script_cmd_table_entry "):
+            constants[line.split()[1]] = value
+            value += 1
+    return constants
+'''
+script_constants_new = '''def load_script_command_constants() -> Dict[str, int]:
+    constants = {}
+    value = 0
+    table = ROOT / "data/script_cmd_table.inc"
+    table_text = table.read_text()
+
+    # Newer pokeemerald-style symbolic table.
+    for line in table_text.splitlines():
+        line = line.split("@", 1)[0].strip()
+        if line.startswith("script_cmd_table_entry "):
+            constants[line.split()[1]] = value
+            value += 1
+    if constants:
+        return constants
+
+    # FireRed-style raw table, e.g.:
+    #   .4byte ScrCmd_setflag  @ 0x29
+    raw_entries = {}
+    raw_re = re.compile(
+        r"^\\s*\\.4byte\\s+(ScrCmd_[A-Za-z0-9_]+)\\s*@\\s*(0x[0-9A-Fa-f]+)\\s*$"
+    )
+    for raw in table_text.splitlines():
+        match = raw_re.match(raw)
+        if not match:
+            continue
+        function_name, opcode = match.groups()
+        key = function_name[len("ScrCmd_"):].replace("_", "").lower()
+        raw_entries[key] = int(opcode, 16)
+
+    wanted = set(re.findall(r"\\bSCR_OP_[A-Z0-9_]+\\b", Path(__file__).read_text()))
+    missing = []
+    for name in wanted:
+        key = name[len("SCR_OP_"):].replace("_", "").lower()
+        if key not in raw_entries:
+            missing.append(name)
+            continue
+        constants[name] = raw_entries[key]
+
+    if missing:
+        raise ValueError(
+            "FireRed script command table is missing converter opcodes: "
+            + ", ".join(sorted(missing))
+        )
+    if not constants:
+        raise ValueError("Could not parse FireRed script command table")
+    return constants
+'''
+if script_constants_old not in text:
+    raise SystemExit("converter script-command constants hook changed upstream; adapter needs review")
+text = text.replace(script_constants_old, script_constants_new)
+
+script_functions_old = '''def load_script_command_functions() -> List[str]:
+    functions = []
+    for line in (ROOT / "data/script_cmd_table.inc").read_text().splitlines():
+        line = line.split("@", 1)[0].strip()
+        if not line.startswith("script_cmd_table_entry "):
+            continue
+        functions.append(line.split()[2])
+    return functions
+'''
+script_functions_new = '''def load_script_command_functions() -> List[str]:
+    functions = []
+    table_text = (ROOT / "data/script_cmd_table.inc").read_text()
+
+    for line in table_text.splitlines():
+        line = line.split("@", 1)[0].strip()
+        if not line.startswith("script_cmd_table_entry "):
+            continue
+        functions.append(line.split()[2])
+    if functions:
+        return functions
+
+    # FireRed's raw command table includes the opcode as a comment on every
+    # real table entry. Requiring that comment also avoids the sentinel
+    # gScriptCmdTableEnd entry.
+    raw_re = re.compile(
+        r"^\\s*\\.4byte\\s+(ScrCmd_[A-Za-z0-9_]+)\\s*@\\s*0x[0-9A-Fa-f]+\\s*$"
+    )
+    for raw in table_text.splitlines():
+        match = raw_re.match(raw)
+        if match:
+            functions.append(match.group(1))
+    return functions
+'''
+if script_functions_old not in text:
+    raise SystemExit("converter script-command functions hook changed upstream; adapter needs review")
+text = text.replace(script_functions_old, script_functions_new)
+
+# FireRed's msgbox macro has an optional second argument:
+#   msgbox text, type=MSGBOX_DEFAULT
+# pokeemerald-wasm's converter assumed the type was always supplied.
+msgbox_old = '''    if stripped.startswith("msgbox "):
+        text, msgbox_type = split_args(stripped[len("msgbox "):])
+        return [
+            f".byte {parse_int('SCR_OP_LOAD_WORD', constants)}",
+            ".byte 0",
+            f".4byte {text}",
+            f".byte {parse_int('SCR_OP_CALL_STD', constants)}",
+            f".byte {msgbox_type}",
+        ]
+'''
+msgbox_new = '''    if stripped.startswith("msgbox "):
+        args = split_args(stripped[len("msgbox "):])
+        if not args or not args[0]:
+            raise ValueError(f"FireRed msgbox is missing text: {stripped}")
+        if len(args) > 2:
+            raise ValueError(f"FireRed msgbox expects 1 or 2 args, got {len(args)}: {stripped}")
+        text = args[0]
+        msgbox_type = args[1] if len(args) == 2 and args[1] else str(parse_int("MSGBOX_DEFAULT", constants))
+        return [
+            f".byte {parse_int('SCR_OP_LOAD_WORD', constants)}",
+            ".byte 0",
+            f".4byte {text}",
+            f".byte {parse_int('SCR_OP_CALL_STD', constants)}",
+            f".byte {msgbox_type}",
+        ]
+'''
+if msgbox_old not in text:
+    raise SystemExit("converter msgbox hook changed upstream; adapter needs review")
+text = text.replace(msgbox_old, msgbox_new)
+
+# FireRed defines a handful of movement helper macros locally inside map
+# scripts (for example PalletTown's walk_to_lab and PewterCity's walk_to_gym).
+# The Emerald WASM converter preloads only asm/macros/* and then discards any
+# .macro blocks encountered in the flattened event script. That leaves later
+# invocations as bare tokens, which LLVM/WASM interprets as invalid
+# instructions. Capture local macro definitions in source order and honor
+# .purgem so expansion matches GNU as semantics.
+inline_macro_old = '''    skip_macro = 0
+    for raw in text.splitlines():
+        is_global_label = "; .global" in raw
+        line = strip_at_comment(raw)
+        if not line:
+            continue
+
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        if stripped.startswith(".if "):
+            expr = stripped[len(".if "):].strip()
+            try:
+                conditional_stack.append(bool(eval(expr, {"__builtins__": {}}, constants)))
+            except Exception:
+                conditional_stack.append(True)
+            continue
+        if stripped.startswith(".ifndef "):
+            name = stripped[len(".ifndef "):].strip()
+            conditional_stack.append(name not in constants)
+            continue
+        if stripped == ".else":
+            if conditional_stack:
+                conditional_stack[-1] = not conditional_stack[-1]
+            continue
+        if stripped == ".endif":
+            if conditional_stack:
+                conditional_stack.pop()
+            continue
+        if conditional_stack and not all(conditional_stack):
+            continue
+        if skip_macro:
+            if stripped.startswith(".macro "):
+                skip_macro += 1
+            elif stripped == ".endm":
+                skip_macro -= 1
+            continue
+        if stripped.startswith(".macro "):
+            skip_macro = 1
+            continue
+'''
+inline_macro_new = '''    inline_macro_name = None
+    inline_macro_params: List[Tuple[str, Optional[str]]] = []
+    inline_macro_body: List[str] = []
+    inline_macro_depth = 0
+
+    def parse_inline_macro_signature(signature: str) -> Tuple[str, List[Tuple[str, Optional[str]]]]:
+        name, _, params_text = signature.partition(" ")
+        params: List[Tuple[str, Optional[str]]] = []
+        for param in split_args(re.sub(r":req\\s+(?=\\w)", ":req, ", params_text)):
+            if not param:
+                continue
+            if param.endswith(":vararg"):
+                params.append((param[:-7].strip(), VARARG_DEFAULT))
+                continue
+            if param.endswith(":req"):
+                param = param[:-4]
+            if "=" in param:
+                param_name, default = param.split("=", 1)
+                params.append((param_name.strip(), default.strip()))
+            else:
+                params.append((param.strip(), None))
+        return name, params
+
+    for raw in text.splitlines():
+        is_global_label = "; .global" in raw
+        line = strip_at_comment(raw)
+        if not line:
+            continue
+
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+
+        # Once a local macro starts, preserve its body verbatim for
+        # expand_event_macro. In particular, do not evaluate .if/.else here;
+        # those conditionals belong to macro expansion time.
+        if inline_macro_name is not None:
+            if stripped.startswith(".macro "):
+                inline_macro_depth += 1
+                inline_macro_body.append(stripped)
+                continue
+            if stripped == ".endm":
+                inline_macro_depth -= 1
+                if inline_macro_depth == 0:
+                    macros[inline_macro_name] = AsmMacro(inline_macro_params, inline_macro_body)
+                    inline_macro_name = None
+                    inline_macro_params = []
+                    inline_macro_body = []
+                else:
+                    inline_macro_body.append(stripped)
+                continue
+            inline_macro_body.append(stripped)
+            continue
+
+        if stripped.startswith(".if "):
+            expr = stripped[len(".if "):].strip()
+            try:
+                conditional_stack.append(bool(eval(expr, {"__builtins__": {}}, constants)))
+            except Exception:
+                conditional_stack.append(True)
+            continue
+        if stripped.startswith(".ifndef "):
+            name = stripped[len(".ifndef "):].strip()
+            conditional_stack.append(name not in constants)
+            continue
+        if stripped == ".else":
+            if conditional_stack:
+                conditional_stack[-1] = not conditional_stack[-1]
+            continue
+        if stripped == ".endif":
+            if conditional_stack:
+                conditional_stack.pop()
+            continue
+        if conditional_stack and not all(conditional_stack):
+            continue
+
+        if stripped.startswith(".macro "):
+            inline_macro_name, inline_macro_params = parse_inline_macro_signature(
+                stripped[len(".macro "):]
+            )
+            inline_macro_body = []
+            inline_macro_depth = 1
+            continue
+
+        if stripped.startswith(".purgem "):
+            macros.pop(stripped[len(".purgem "):].strip(), None)
+            continue
+'''
+if inline_macro_old not in text:
+    raise SystemExit("converter inline-macro hook changed upstream; adapter needs review")
+text = text.replace(inline_macro_old, inline_macro_new)
+
+# FireRed event scripts use GNU assembler .equ aliases (for example the
+# Trainer Tower's FLAG_TEMP_* / VAR_TEMP_* aliases). LLVM's WebAssembly
+# assembler rejects redefinitions that GNU as tolerates. Resolve only numeric
+# .equ expressions in the converter; preserve genuinely symbolic aliases.
+equ_old = '''        if stripped.startswith(".equiv ") or stripped.startswith(".set "):
+            name, expr = re.split(r"\\s+", stripped, maxsplit=1)[1].split(",", 1)
+            try:
+                constants[name.strip()] = eval(expr, {"__builtins__": {}}, constants)
+            except Exception:
+                pass
+            continue
+'''
+equ_new = '''        if stripped.startswith((".equ ", ".equiv ", ".set ")):
+            name, expr = re.split(r"\\s+", stripped, maxsplit=1)[1].split(",", 1)
+            name = name.strip()
+            expr = expr.strip()
+
+            value = eval_asm_expr(expr, constants)
+            if value is not None:
+                constants[name] = value
+                continue
+
+            # Existing Emerald handling intentionally consumes unresolved
+            # .set/.equiv directives. For FireRed .equ, keep a symbolic alias
+            # when it cannot be reduced to a number.
+            if stripped.startswith(".equ "):
+                out.append(stripped)
+            continue
+'''
+if equ_old not in text:
+    raise SystemExit("converter assembler-assignment hook changed upstream; adapter needs review")
+text = text.replace(equ_old, equ_new)
+
+needle = '''    for raw in (ROOT / "include/constants/tms_hms.h").read_text().splitlines():
+'''
+replacement = '''    tm_hm_path = ROOT / "include/constants/tms_hms.h"
+    if not tm_hm_path.exists():
+        # FireRed/LeafGreen exposes its TM/HM item constants directly from
+        # include/constants/items.h rather than Emerald's FOREACH_TM/HM file.
+        return out
+
+    for raw in tm_hm_path.read_text().splitlines():
+'''
+
+if needle not in text:
+    raise SystemExit("converter TM/HM hook changed upstream; adapter needs review")
+
+text = text.replace(needle, replacement)
+
+# The Emerald converter applies a few Emerald-specific fallback constants after
+# reading source headers. FireRed uses different values for these map-event
+# fields, so patch the copied converter to match FireRed's own constants.
+constant_replacements = {
+    '"OBJ_KIND_CLONE": 1,': '"OBJ_KIND_CLONE": 255,',
+    '"FLAG_HIDDEN_ITEMS_START": 0x1F4,': '"FLAG_HIDDEN_ITEMS_START": 1000,',
+}
+for old, new in constant_replacements.items():
+    if old not in text:
+        raise SystemExit(f"converter fallback constant changed upstream: {old}")
+    text = text.replace(old, new)
+
+
+# FireRed/LeafGreen map event layout differs from Emerald in two important
+# places. Adapt the copied Emerald WASM converter instead of changing upstream
+# game sources.
+hidden_old = '''    if stripped.startswith("bg_hidden_item_event "):
+        x, y, elevation, item, flag = split_args(stripped[len("bg_hidden_item_event "):])
+        hidden_item = parse_int("BG_EVENT_HIDDEN_ITEM", constants)
+        flag_start = parse_int("FLAG_HIDDEN_ITEMS_START", constants)
+        stripped = f"bg_event {x}, {y}, {elevation}, {hidden_item}, {item}, (({flag}) - {flag_start})"
+'''
+hidden_new = '''    if stripped.startswith("bg_hidden_item_event "):
+        args = split_args(stripped[len("bg_hidden_item_event "):])
+        if len(args) != 7:
+            raise ValueError(f"FireRed bg_hidden_item_event expects 7 args, got {len(args)}: {stripped}")
+        x, y, elevation, item, flag, quantity, underfoot = args
+        hidden_item = parse_int("BG_EVENT_HIDDEN_ITEM", constants)
+        flag_start = parse_int("FLAG_HIDDEN_ITEMS_START", constants)
+        stripped = (
+            f"bg_event {x}, {y}, {elevation}, {hidden_item}, {item}, "
+            f"(({flag}) - {flag_start}), ({quantity}) | (({underfoot}) << 7)"
+        )
+'''
+if hidden_old not in text:
+    raise SystemExit("converter hidden-item hook changed upstream; adapter needs review")
+text = text.replace(hidden_old, hidden_new)
+
+bg_old = '''        if kind_value == parse_int("BG_EVENT_HIDDEN_ITEM", constants):
+            lines.extend([f".2byte {arg6}", f".2byte {args[5]}"])
+        else:
+            lines.append(f".4byte {arg6}")
+'''
+bg_new = '''        if kind_value == parse_int("BG_EVENT_HIDDEN_ITEM", constants):
+            if len(args) < 7:
+                raise ValueError(f"FireRed hidden bg_event expects item, flag, quantity/underfoot byte: {stripped}")
+            lines.extend([
+                f".2byte {arg6}",
+                f".byte {args[5]}",
+                f".byte {args[6]}",
+            ])
+        else:
+            lines.append(f".4byte {arg6}")
+'''
+if bg_old not in text:
+    raise SystemExit("converter bg_event hook changed upstream; adapter needs review")
+text = text.replace(bg_old, bg_new)
+
+flags_old = '''    if stripped.startswith("map_header_flags "):
+        values = {}
+        for arg in split_args(stripped[len("map_header_flags "):]):
+            key, value = arg.split("=", 1)
+            values[key.strip()] = parse_int(value, constants)
+        byte = (
+            ((values["show_map_name"] & 1) << 3)
+            | ((values["allow_running"] & 1) << 2)
+            | ((values["allow_escaping"] & 1) << 1)
+            | (values["allow_cycling"] & 1)
+        )
+        return [f".byte {byte}"]
+'''
+flags_new = '''    if stripped.startswith("map_header_flags "):
+        values = {}
+        for arg in split_args(stripped[len("map_header_flags "):]):
+            if "=" not in arg:
+                raise ValueError(f"FireRed map_header_flags expects named args: {stripped}")
+            key, value = arg.split("=", 1)
+            values[key.strip()] = parse_int(value.strip(), constants)
+        required = {"allow_cycling", "allow_escaping", "allow_running", "show_map_name"}
+        if set(values) != required:
+            raise ValueError(
+                f"FireRed map_header_flags keys mismatch; expected {sorted(required)}, "
+                f"got {sorted(values)}: {stripped}"
+            )
+        flags = (
+            ((values["show_map_name"] & 1) << 2)
+            | ((values["allow_running"] & 1) << 1)
+            | ((values["allow_escaping"] & 1) << 0)
+        )
+        return [
+            f".byte {values['allow_cycling']}",
+            f".byte {flags}",
+        ]
+'''
+if flags_old not in text:
+    raise SystemExit("converter map-header hook changed upstream; adapter needs review")
+text = text.replace(flags_old, flags_new)
+
+path.write_text(text)
