@@ -186,6 +186,18 @@ if s.count(anchor) != 1 or s.count(signature + " {") != 1:
 declaration = signature + ";"
 if declaration not in s:
     s = s.replace(anchor, anchor + "\n" + declaration + "\n", 1)
+
+# V0.1 deliberately keeps browser audio silent. The PC-port implementation of
+# m4aSoundVSync mixes/queues real audio and depends on cgb_get_buffer() from
+# platform/cgb_audio.c, which the web build intentionally excludes. Keep the
+# browser-owned no-op m4aSoundVSync from sound_web.c and compile the native
+# implementation only outside WEB builds.
+vsync_start = "void m4aSoundVSync(void)\n{\n"
+vsync_end = "\n}\n\n#if 0\n// In:"
+if s.count(vsync_start) != 1 or s.count(vsync_end) != 1:
+    raise RuntimeError("music_player.c m4aSoundVSync patch anchors changed; review required")
+s = s.replace(vsync_start, "#ifndef WEB\n" + vsync_start, 1)
+s = s.replace(vsync_end, "\n}\n#endif\n\n#if 0\n// In:", 1)
 p.write_text(s)
 
 # FireRed has one legacy battle helper that passes two setbyte macro arguments
