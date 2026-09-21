@@ -173,6 +173,20 @@ if naked_count != 3:
     raise RuntimeError(f"Expected 3 NAKED RFU callback helpers, found {naked_count}")
 s = s.replace("\nNAKED\n", "\n")
 p.write_text(s)
+
+# The native music player calls this void function before its definition.
+# Declare the exact signature after the headers, before any caller, rather
+# than suppressing the conflicting-type error or removing the implementation.
+p = root / "src/music_player.c"
+s = p.read_text()
+anchor = '#include "platform.h"\n'
+signature = "void ChnVolSetAsm(struct SoundChannel *chan, struct MusicPlayerTrack *track)"
+if s.count(anchor) != 1 or s.count(signature + " {") != 1:
+    raise RuntimeError("music_player.c ChnVolSetAsm patch anchors changed; review required")
+declaration = signature + ";"
+if declaration not in s:
+    s = s.replace(anchor, anchor + "\n" + declaration + "\n", 1)
+p.write_text(s)
 PY
 
 section "Install pinned WASM data/asset helpers"
