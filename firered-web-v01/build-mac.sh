@@ -160,6 +160,19 @@ s = s.replace('(&REG_DMA0SAD)[dmaNum * 3] = src;',
 s = s.replace('(&REG_DMA0DAD)[dmaNum * 3] = dest;',
               '(&REG_DMA0DAD)[dmaNum * 3] = (u32)(uintptr_t)dest;')
 p.write_text(s)
+
+# The RFU interrupt source contains three ARM matching helpers marked NAKED.
+# Their bodies are ordinary C callback forwarding; WebAssembly has no ARM
+# prologue/epilogue requirement, and Clang rejects C statements in naked
+# functions. Keep the behavior and remove only those three matching markers in
+# the temporary build checkout.
+p = root / "src/librfu_intr.c"
+s = p.read_text()
+naked_count = s.count("\nNAKED\n")
+if naked_count != 3:
+    raise RuntimeError(f"Expected 3 NAKED RFU callback helpers, found {naked_count}")
+s = s.replace("\nNAKED\n", "\n")
+p.write_text(s)
 PY
 
 section "Install pinned WASM data/asset helpers"
