@@ -200,6 +200,21 @@ s = s.replace(vsync_start, "#ifndef WEB\n" + vsync_start, 1)
 s = s.replace(vsync_end, "\n}\n#endif\n\n#if 0\n// In:", 1)
 p.write_text(s)
 
+# m4a_1.c still carries matching-era no-argument placeholder definitions for
+# two functions that the browser audio layer provides with their real pointer
+# signatures. Hide only those placeholders for WEB so wasm-ld sees one ABI.
+p = root / "src/m4a_1.c"
+s = p.read_text()
+legacy_audio_stubs = (
+    ("void MPlayMain(){}", "MPlayMain"),
+    ("void RealClearChain(){}", "RealClearChain"),
+)
+for old, name in legacy_audio_stubs:
+    if s.count(old) != 1:
+        raise RuntimeError(f"Expected exactly one legacy {name} stub, found {s.count(old)}")
+    s = s.replace(old, f"#ifndef WEB\n{old}\n#endif", 1)
+p.write_text(s)
+
 # FireRed has one legacy battle helper that passes two setbyte macro arguments
 # separated only by whitespace. GNU as accepts this, but the WASM converter
 # needs an explicit separator once sSTATCHANGER expands to an address
@@ -364,6 +379,7 @@ DATA_SOURCES=(
   data/mystery_event_msg.s
   data/mystery_event_script_cmd_table.s
   data/sound_data.s
+  data/multiboot_berry_glitch_fix.s
 )
 
 section "Preflight FireRed maps/events/battle data as WebAssembly objects"
