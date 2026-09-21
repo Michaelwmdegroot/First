@@ -115,6 +115,39 @@ if script_functions_old not in text:
     raise SystemExit("converter script-command functions hook changed upstream; adapter needs review")
 text = text.replace(script_functions_old, script_functions_new)
 
+# FireRed's msgbox macro has an optional second argument:
+#   msgbox text, type=MSGBOX_DEFAULT
+# pokeemerald-wasm's converter assumed the type was always supplied.
+msgbox_old = '''    if stripped.startswith("msgbox "):
+        text, msgbox_type = split_args(stripped[len("msgbox "):])
+        return [
+            f".byte {parse_int('SCR_OP_LOAD_WORD', constants)}",
+            ".byte 0",
+            f".4byte {text}",
+            f".byte {parse_int('SCR_OP_CALL_STD', constants)}",
+            f".byte {msgbox_type}",
+        ]
+'''
+msgbox_new = '''    if stripped.startswith("msgbox "):
+        args = split_args(stripped[len("msgbox "):])
+        if not args or not args[0]:
+            raise ValueError(f"FireRed msgbox is missing text: {stripped}")
+        if len(args) > 2:
+            raise ValueError(f"FireRed msgbox expects 1 or 2 args, got {len(args)}: {stripped}")
+        text = args[0]
+        msgbox_type = args[1] if len(args) == 2 and args[1] else str(parse_int("MSGBOX_DEFAULT", constants))
+        return [
+            f".byte {parse_int('SCR_OP_LOAD_WORD', constants)}",
+            ".byte 0",
+            f".4byte {text}",
+            f".byte {parse_int('SCR_OP_CALL_STD', constants)}",
+            f".byte {msgbox_type}",
+        ]
+'''
+if msgbox_old not in text:
+    raise SystemExit("converter msgbox hook changed upstream; adapter needs review")
+text = text.replace(msgbox_old, msgbox_new)
+
 needle = '''    for raw in (ROOT / "include/constants/tms_hms.h").read_text().splitlines():
 '''
 replacement = '''    tm_hm_path = ROOT / "include/constants/tms_hms.h"
