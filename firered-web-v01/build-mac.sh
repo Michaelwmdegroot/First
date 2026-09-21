@@ -272,6 +272,78 @@ if '#include "menu_helpers.h"\n' not in s:
     s = s.replace(anchor, anchor + '#include "menu_helpers.h"\n', 1)
 p.write_text(s)
 
+# Add narrow WEB-only checkpoints around the first-step overworld pipeline.
+# These do not change gameplay state; they only surface the last completed
+# operation if a strict WASM trap still occurs.
+p = root / "src/field_control_avatar.c"
+s = p.read_text()
+decl_anchor = '#include "constants/metatile_behaviors.h"\n'
+decl = '#ifdef WEB\nvoid WebBootCheckpoint(const char *stage);\n#endif\n'
+if decl not in s:
+    if s.count(decl_anchor) != 1:
+        raise RuntimeError("field_control_avatar.c include anchor changed")
+    s = s.replace(decl_anchor, decl_anchor + decl, 1)
+
+old = '''    if (input->tookStep)
+    {
+        IncrementGameStat(GAME_STAT_STEPS);
+        WonderNews_IncrementStepCounter();
+        IncrementRenewableHiddenItemStepCounter();
+        RunMassageCooldownStepCounter();
+        IncrementResortGorgeousStepCounter();
+        IncrementBirthIslandRockStepCount();
+        if (TryStartStepBasedScript(&position, metatileBehavior, playerDirection) == TRUE)
+'''
+new = '''    if (input->tookStep)
+    {
+#ifdef WEB
+        WebBootCheckpoint("Step: game stat");
+#endif
+        IncrementGameStat(GAME_STAT_STEPS);
+#ifdef WEB
+        WebBootCheckpoint("Step: wonder news");
+#endif
+        WonderNews_IncrementStepCounter();
+#ifdef WEB
+        WebBootCheckpoint("Step: hidden items");
+#endif
+        IncrementRenewableHiddenItemStepCounter();
+#ifdef WEB
+        WebBootCheckpoint("Step: massage cooldown");
+#endif
+        RunMassageCooldownStepCounter();
+#ifdef WEB
+        WebBootCheckpoint("Step: resort gorgeous");
+#endif
+        IncrementResortGorgeousStepCounter();
+#ifdef WEB
+        WebBootCheckpoint("Step: birth island");
+#endif
+        IncrementBirthIslandRockStepCount();
+#ifdef WEB
+        WebBootCheckpoint("Step: step scripts");
+#endif
+        if (TryStartStepBasedScript(&position, metatileBehavior, playerDirection) == TRUE)
+'''
+if s.count(old) != 1:
+    raise RuntimeError(f"Expected one first-step pipeline, found {s.count(old)}")
+s = s.replace(old, new, 1)
+
+enc_old = '''    if (input->checkStandardWildEncounter && CheckStandardWildEncounter(metatileAttributes) == TRUE)
+    {
+'''
+enc_new = '''#ifdef WEB
+    if (input->checkStandardWildEncounter)
+        WebBootCheckpoint("Step: encounter check");
+#endif
+    if (input->checkStandardWildEncounter && CheckStandardWildEncounter(metatileAttributes) == TRUE)
+    {
+'''
+if s.count(enc_old) != 1:
+    raise RuntimeError(f"Expected one encounter-check branch, found {s.count(enc_old)}")
+s = s.replace(enc_old, enc_new, 1)
+p.write_text(s)
+
 # The RFU interrupt source contains three ARM matching helpers marked NAKED.
 # Their bodies are ordinary C callback forwarding; WebAssembly has no ARM
 # prologue/epilogue requirement, and Clang rejects C statements in naked
