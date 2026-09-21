@@ -148,6 +148,146 @@ if msgbox_old not in text:
     raise SystemExit("converter msgbox hook changed upstream; adapter needs review")
 text = text.replace(msgbox_old, msgbox_new)
 
+# FireRed defines a handful of movement helper macros locally inside map
+# scripts (for example PalletTown's walk_to_lab and PewterCity's walk_to_gym).
+# The Emerald WASM converter preloads only asm/macros/* and then discards any
+# .macro blocks encountered in the flattened event script. That leaves later
+# invocations as bare tokens, which LLVM/WASM interprets as invalid
+# instructions. Capture local macro definitions in source order and honor
+# .purgem so expansion matches GNU as semantics.
+inline_macro_old = '''    skip_macro = 0
+    for raw in text.splitlines():
+        is_global_label = "; .global" in raw
+        line = strip_at_comment(raw)
+        if not line:
+            continue
+
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        if stripped.startswith(".if "):
+            expr = stripped[len(".if "):].strip()
+            try:
+                conditional_stack.append(bool(eval(expr, {"__builtins__": {}}, constants)))
+            except Exception:
+                conditional_stack.append(True)
+            continue
+        if stripped.startswith(".ifndef "):
+            name = stripped[len(".ifndef "):].strip()
+            conditional_stack.append(name not in constants)
+            continue
+        if stripped == ".else":
+            if conditional_stack:
+                conditional_stack[-1] = not conditional_stack[-1]
+            continue
+        if stripped == ".endif":
+            if conditional_stack:
+                conditional_stack.pop()
+            continue
+        if conditional_stack and not all(conditional_stack):
+            continue
+        if skip_macro:
+            if stripped.startswith(".macro "):
+                skip_macro += 1
+            elif stripped == ".endm":
+                skip_macro -= 1
+            continue
+        if stripped.startswith(".macro "):
+            skip_macro = 1
+            continue
+'''
+inline_macro_new = '''    inline_macro_name = None
+    inline_macro_params: List[Tuple[str, Optional[str]]] = []
+    inline_macro_body: List[str] = []
+    inline_macro_depth = 0
+
+    def parse_inline_macro_signature(signature: str) -> Tuple[str, List[Tuple[str, Optional[str]]]]:
+        name, _, params_text = signature.partition(" ")
+        params: List[Tuple[str, Optional[str]]] = []
+        for param in split_args(re.sub(r":req\\s+(?=\\w)", ":req, ", params_text)):
+            if not param:
+                continue
+            if param.endswith(":vararg"):
+                params.append((param[:-7].strip(), VARARG_DEFAULT))
+                continue
+            if param.endswith(":req"):
+                param = param[:-4]
+            if "=" in param:
+                param_name, default = param.split("=", 1)
+                params.append((param_name.strip(), default.strip()))
+            else:
+                params.append((param.strip(), None))
+        return name, params
+
+    for raw in text.splitlines():
+        is_global_label = "; .global" in raw
+        line = strip_at_comment(raw)
+        if not line:
+            continue
+
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+
+        # Once a local macro starts, preserve its body verbatim for
+        # expand_event_macro. In particular, do not evaluate .if/.else here;
+        # those conditionals belong to macro expansion time.
+        if inline_macro_name is not None:
+            if stripped.startswith(".macro "):
+                inline_macro_depth += 1
+                inline_macro_body.append(stripped)
+                continue
+            if stripped == ".endm":
+                inline_macro_depth -= 1
+                if inline_macro_depth == 0:
+                    macros[inline_macro_name] = AsmMacro(inline_macro_params, inline_macro_body)
+                    inline_macro_name = None
+                    inline_macro_params = []
+                    inline_macro_body = []
+                else:
+                    inline_macro_body.append(stripped)
+                continue
+            inline_macro_body.append(stripped)
+            continue
+
+        if stripped.startswith(".if "):
+            expr = stripped[len(".if "):].strip()
+            try:
+                conditional_stack.append(bool(eval(expr, {"__builtins__": {}}, constants)))
+            except Exception:
+                conditional_stack.append(True)
+            continue
+        if stripped.startswith(".ifndef "):
+            name = stripped[len(".ifndef "):].strip()
+            conditional_stack.append(name not in constants)
+            continue
+        if stripped == ".else":
+            if conditional_stack:
+                conditional_stack[-1] = not conditional_stack[-1]
+            continue
+        if stripped == ".endif":
+            if conditional_stack:
+                conditional_stack.pop()
+            continue
+        if conditional_stack and not all(conditional_stack):
+            continue
+
+        if stripped.startswith(".macro "):
+            inline_macro_name, inline_macro_params = parse_inline_macro_signature(
+                stripped[len(".macro "):]
+            )
+            inline_macro_body = []
+            inline_macro_depth = 1
+            continue
+
+        if stripped.startswith(".purgem "):
+            macros.pop(stripped[len(".purgem "):].strip(), None)
+            continue
+'''
+if inline_macro_old not in text:
+    raise SystemExit("converter inline-macro hook changed upstream; adapter needs review")
+text = text.replace(inline_macro_old, inline_macro_new)
+
 # FireRed event scripts use GNU assembler .equ aliases (for example the
 # Trainer Tower's FLAG_TEMP_* / VAR_TEMP_* aliases). LLVM's WebAssembly
 # assembler rejects redefinitions that GNU as tolerates. Resolve only numeric
