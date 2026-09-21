@@ -141,6 +141,65 @@ p = root / "src/main.c"
 s = p.read_text()
 if '#include "platform.h"' not in s:
     s = s.replace('#include "sloopsvc.h"\n', '#include "sloopsvc.h"\n#include "platform.h"\n')
+
+boot_decl_anchor = '#include "platform.h"\n'
+boot_decl = '#ifdef WEB\nvoid WebBootCheckpoint(const char *stage);\n#endif\n'
+if boot_decl not in s:
+    if s.count(boot_decl_anchor) != 1:
+        raise RuntimeError("main.c platform include anchor changed; review required")
+    s = s.replace(boot_decl_anchor, boot_decl_anchor + boot_decl, 1)
+
+boot_sequence_old = '''    InitGpuRegManager();
+    REG_WAITCNT = WAITCNT_PREFETCH_ENABLE | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3;
+    InitKeys();
+    InitIntrHandlers();
+    m4aSoundInit();
+    EnableVCountIntrAtLine150();
+    //InitRFU();
+    CheckForFlashMemory();
+    InitMainCallbacks();
+    InitMapMusic();
+    ClearDma3Requests();
+    ResetBgs();
+    InitHeap(gHeap, HEAP_SIZE);
+    SetDefaultFontsPointer();
+'''
+boot_sequence_new = '''    InitGpuRegManager();
+#ifdef WEB
+    WebBootCheckpoint("FireRed: GPU ready");
+#endif
+    REG_WAITCNT = WAITCNT_PREFETCH_ENABLE | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3;
+    InitKeys();
+    InitIntrHandlers();
+#ifdef WEB
+    WebBootCheckpoint("FireRed: interrupts ready");
+#endif
+    m4aSoundInit();
+#ifdef WEB
+    WebBootCheckpoint("FireRed: sound init ready");
+#endif
+    EnableVCountIntrAtLine150();
+    //InitRFU();
+    CheckForFlashMemory();
+#ifdef WEB
+    WebBootCheckpoint("FireRed: flash ready");
+#endif
+    InitMainCallbacks();
+    InitMapMusic();
+#ifdef WEB
+    WebBootCheckpoint("FireRed: callbacks ready");
+#endif
+    ClearDma3Requests();
+    ResetBgs();
+    InitHeap(gHeap, HEAP_SIZE);
+    SetDefaultFontsPointer();
+#ifdef WEB
+    WebBootCheckpoint("FireRed: entering frame loop");
+#endif
+'''
+if s.count(boot_sequence_old) != 1:
+    raise RuntimeError(f"Expected one FireRed AgbMain boot sequence, found {s.count(boot_sequence_old)}")
+s = s.replace(boot_sequence_old, boot_sequence_new, 1)
 p.write_text(s)
 
 p = root / "src/libagbsyscall.c"
