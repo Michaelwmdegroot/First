@@ -149,8 +149,30 @@ static void RenderFrame(void)
     SDL_RenderTexture(sRenderer, sTexture, NULL, NULL);
     SDL_RenderPresent(sRenderer);
 
-    if (sRenderedFrames++ == 0)
+    sRenderedFrames++;
+    if (sRenderedFrames == 1)
+    {
         WebBootCheckpoint("First frame");
+    }
+    else if ((sRenderedFrames % 60) == 0)
+    {
+        char probe[128];
+        const u16 backdrop = *(u16 *)PLTT;
+        const u16 topLeft = sFrame555[0];
+        const u16 center = sFrame555[(DISPLAY_HEIGHT / 2) * DISPLAY_WIDTH + (DISPLAY_WIDTH / 2)];
+
+        snprintf(
+            probe,
+            sizeof(probe),
+            "Frame %u | state %u | pal %04X | px %04X/%04X",
+            sRenderedFrames,
+            gMain.state,
+            backdrop,
+            topLeft,
+            center
+        );
+        WebBootCheckpoint(probe);
+    }
 
     REG_VCOUNT = 161;
 }
@@ -207,7 +229,13 @@ void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame)
 void VBlankIntrWait(void)
 {
     ProcessEvents();
-    RenderFrame();
+
+    /*
+     * Match the working native PC port's frame order:
+     * wait for the next frame boundary, run VBlank DMA/callback work, then
+     * draw the visible frame from the freshly transferred GPU state.
+     */
+    emscripten_sleep(16);
 
     REG_DISPSTAT |= INTR_FLAG_VBLANK;
     RunDMAs(DMA_HBLANK);
@@ -217,7 +245,7 @@ void VBlankIntrWait(void)
 
     REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
 
-    emscripten_sleep(16);
+    RenderFrame();
 }
 
 int main(void)
