@@ -1,5 +1,15 @@
 # FireRed Web V0.1 — local Mac build
 
+## Current baseline
+
+As of 2026-09-21, V0.1 is a manually validated playable browser baseline on macOS/Safari. The user has successfully completed the intro/new-game flow, walked in the overworld, obtained a starter, battled the rival, fought wild Pokémon, healed at a Pokémon Center, and completed a normal in-game save.
+
+The source-runtime baseline before the handoff documentation is commit `86189c5933832c141757d297190adfccfdfd3833`.
+
+Still verify once before calling persistence fully accepted: hard refresh/restart the browser and use Continue to confirm the saved position/team are restored. Mobile/touch and audio are not yet accepted V0.1 features; audio is intentionally silent.
+
+For architecture, solved porting issues, runtime internals, frozen-platform guidance, and V0.2 handoff, read `HANDOFF_V0.1_TO_V0.2.md`.
+
 This lane keeps FireRed source-native:
 
 `pokefirered-pc-port source -> Emscripten/WebAssembly -> browser`
@@ -62,6 +72,8 @@ That command builds, stages only `game.js` and `game.wasm`, commits them when ch
 
 ## When the build stops
 
-V0.1 is still a port in progress. If compilation, data conversion or linking stops, the important artifact is `firered-web-v01/build-mac.log`. The last failing `CC`, `DATA`, or linker block is the next bounded porting task; do not switch back to a ROM/emulator route to work around it.
+The V0.1 build/runtime path is now proven, but future content changes can still expose a compile, conversion, linker, or runtime edge case. If a build stops, the important artifact is `firered-web-v01/build-mac.log`. Use the first real failing `CC`, `DATA`, or linker block as the next bounded task; do not switch back to a ROM/emulator route to work around it.
+
+For V0.2, treat the browser platform as frozen by default. Prefer content/data edits and only reopen `web.c`, the converter, save path, or build lane for a reproduced platform bug.
 
 The repository root games are not touched by this build lane.
