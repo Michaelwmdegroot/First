@@ -25,6 +25,18 @@ if needle not in text:
 
 text = text.replace(needle, replacement)
 
+# The Emerald converter applies a few Emerald-specific fallback constants after
+# reading source headers. FireRed uses different values for these map-event
+# fields, so patch the copied converter to match FireRed's own constants.
+constant_replacements = {
+    '"OBJ_KIND_CLONE": 1,': '"OBJ_KIND_CLONE": 255,',
+    '"FLAG_HIDDEN_ITEMS_START": 0x1F4,': '"FLAG_HIDDEN_ITEMS_START": 1000,',
+}
+for old, new in constant_replacements.items():
+    if old not in text:
+        raise SystemExit(f"converter fallback constant changed upstream: {old}")
+    text = text.replace(old, new)
+
 
 # FireRed/LeafGreen map event layout differs from Emerald in two important
 # places. Adapt the copied Emerald WASM converter instead of changing upstream
