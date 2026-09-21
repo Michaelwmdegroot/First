@@ -85,13 +85,26 @@ flags_old = '''    if stripped.startswith("map_header_flags "):
         return [f".byte {byte}"]
 '''
 flags_new = '''    if stripped.startswith("map_header_flags "):
-        args = split_args(stripped[len("map_header_flags "):])
-        if len(args) != 4:
-            raise ValueError(f"FireRed map_header_flags expects 4 positional args: {stripped}")
-        allow_cycling, allow_escaping, allow_running, show_map_name = args
+        values = {}
+        for arg in split_args(stripped[len("map_header_flags "):]):
+            if "=" not in arg:
+                raise ValueError(f"FireRed map_header_flags expects named args: {stripped}")
+            key, value = arg.split("=", 1)
+            values[key.strip()] = parse_int(value.strip(), constants)
+        required = {"allow_cycling", "allow_escaping", "allow_running", "show_map_name"}
+        if set(values) != required:
+            raise ValueError(
+                f"FireRed map_header_flags keys mismatch; expected {sorted(required)}, "
+                f"got {sorted(values)}: {stripped}"
+            )
+        flags = (
+            ((values["show_map_name"] & 1) << 2)
+            | ((values["allow_running"] & 1) << 1)
+            | ((values["allow_escaping"] & 1) << 0)
+        )
         return [
-            f".byte {allow_cycling}",
-            f".byte (({show_map_name} & 1) << 2) | (({allow_running} & 1) << 1) | (({allow_escaping} & 1) << 0)",
+            f".byte {values['allow_cycling']}",
+            f".byte {flags}",
         ]
 '''
 if flags_old not in text:
