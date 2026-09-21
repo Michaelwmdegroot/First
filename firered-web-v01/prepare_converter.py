@@ -148,6 +148,39 @@ if msgbox_old not in text:
     raise SystemExit("converter msgbox hook changed upstream; adapter needs review")
 text = text.replace(msgbox_old, msgbox_new)
 
+# FireRed event scripts use GNU assembler .equ aliases (for example the
+# Trainer Tower's FLAG_TEMP_* / VAR_TEMP_* aliases). LLVM's WebAssembly
+# assembler rejects redefinitions that GNU as tolerates. Resolve only numeric
+# .equ expressions in the converter; preserve genuinely symbolic aliases.
+equ_old = '''        if stripped.startswith(".equiv ") or stripped.startswith(".set "):
+            name, expr = re.split(r"\\s+", stripped, maxsplit=1)[1].split(",", 1)
+            try:
+                constants[name.strip()] = eval(expr, {"__builtins__": {}}, constants)
+            except Exception:
+                pass
+            continue
+'''
+equ_new = '''        if stripped.startswith((".equ ", ".equiv ", ".set ")):
+            name, expr = re.split(r"\\s+", stripped, maxsplit=1)[1].split(",", 1)
+            name = name.strip()
+            expr = expr.strip()
+
+            value = eval_asm_expr(expr, constants)
+            if value is not None:
+                constants[name] = value
+                continue
+
+            # Existing Emerald handling intentionally consumes unresolved
+            # .set/.equiv directives. For FireRed .equ, keep a symbolic alias
+            # when it cannot be reduced to a number.
+            if stripped.startswith(".equ "):
+                out.append(stripped)
+            continue
+'''
+if equ_old not in text:
+    raise SystemExit("converter assembler-assignment hook changed upstream; adapter needs review")
+text = text.replace(equ_old, equ_new)
+
 needle = '''    for raw in (ROOT / "include/constants/tms_hms.h").read_text().splitlines():
 '''
 replacement = '''    tm_hm_path = ROOT / "include/constants/tms_hms.h"
