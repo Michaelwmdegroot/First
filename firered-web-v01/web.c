@@ -44,6 +44,20 @@ static void WebBootError(const char *stage, const char *detail)
     }, stage, detail ? detail : "");
 }
 
+void WebSaveCheckpoint(unsigned int sector, const char *stage)
+{
+    EM_ASM({
+        const status = document.getElementById('status');
+        const stage = UTF8ToString($1);
+        const msg = $0 < 1000 ? ('Save: ' + stage + ' ' + $0) : ('Save: ' + stage);
+        if (status) {
+            status.textContent = msg;
+            status.classList.remove('error');
+        }
+        console.log('[FireRed save]', msg);
+    }, sector, stage);
+}
+
 static SDL_Window *sWindow;
 static SDL_Renderer *sRenderer;
 static SDL_Texture *sTexture;
@@ -74,13 +88,21 @@ static void ReadSaveFile(void)
 
 static void WriteSaveFile(void)
 {
-    FILE *save = fopen("/save/pokefirered.sav", "wb");
-    if (save == NULL)
-        return;
+    FILE *save;
 
+    WebSaveCheckpoint(1000, "opening file");
+    save = fopen("/save/pokefirered.sav", "wb");
+    if (save == NULL)
+    {
+        WebBootError("Save file open failed", "/save/pokefirered.sav");
+        return;
+    }
+
+    WebSaveCheckpoint(1000, "writing file");
     fwrite(FLASH_BASE, 1, FLASH_ROM_SIZE_1M, save);
     fclose(save);
 
+    WebSaveCheckpoint(1000, "requesting IDBFS sync");
     EM_ASM({
         if (typeof Module.fireRedRequestSaveSync === 'function') {
             Module.fireRedRequestSaveSync();
@@ -88,6 +110,7 @@ static void WriteSaveFile(void)
             console.error("FireRed save sync helper is unavailable");
         }
     });
+    WebSaveCheckpoint(1000, "file queued");
 }
 
 static u16 SdlKeyToGba(SDL_Keycode key)
