@@ -187,6 +187,19 @@ declaration = signature + ";"
 if declaration not in s:
     s = s.replace(anchor, anchor + "\n" + declaration + "\n", 1)
 p.write_text(s)
+
+# FireRed has one legacy battle helper that passes two setbyte macro arguments
+# separated only by whitespace. GNU as accepts this, but the WASM converter
+# needs an explicit separator once sSTATCHANGER expands to an address
+# expression. Make the separator explicit without changing the emitted bytes.
+p = root / "asm/macros/battle_script.inc"
+s = p.read_text()
+old = r"setbyte sSTATCHANGER \stat | \stages << 4 | \down << 7"
+new = r"setbyte sSTATCHANGER, \stat | \stages << 4 | \down << 7"
+if s.count(old) != 1:
+    raise RuntimeError(f"Expected exactly one FireRed setstatchanger legacy call, found {s.count(old)}")
+s = s.replace(old, new, 1)
+p.write_text(s)
 PY
 
 section "Install pinned WASM data/asset helpers"
