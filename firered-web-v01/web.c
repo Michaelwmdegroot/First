@@ -10,6 +10,7 @@
 #include "gba/flash_internal.h"
 #include "platform/dma.h"
 #include "platform/framedraw.h"
+#include "palette.h"
 
 extern IntrFunc gIntrTable[];
 extern void AgbMain(void);
@@ -164,9 +165,12 @@ static void RenderFrame(void)
         snprintf(
             probe,
             sizeof(probe),
-            "Frame %u | state %u | pal %04X | px %04X/%04X",
+            "Frame %u | state %u | fade %u>%u a%u | pal %04X | px %04X/%04X",
             sRenderedFrames,
             gMain.state,
+            gPaletteFade.y,
+            gPaletteFade.targetY,
+            gPaletteFade.active,
             backdrop,
             topLeft,
             center
@@ -242,6 +246,14 @@ void VBlankIntrWait(void)
 
     if (REG_DISPSTAT & DISPSTAT_VBLANK_INTR)
         gIntrTable[4]();
+
+    /*
+     * FireRed's palette fade blocks while a transfer is pending. On the
+     * browser path, make that transfer explicit after the normal VBlank
+     * callback. This is safe if VBlankCB already transferred the palette and
+     * guarantees the pending flag is cleared before the next main-loop tick.
+     */
+    TransferPlttBuffer();
 
     REG_DISPSTAT &= ~INTR_FLAG_VBLANK;
 
