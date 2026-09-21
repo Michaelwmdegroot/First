@@ -57,8 +57,9 @@
       print: (...args) => console.log(...args),
       printErr: (...args) => console.error(...args),
       onRuntimeInitialized() {
-        document.getElementById('status').textContent = 'Running';
-        document.getElementById('status').classList.add('ready');
+        const status = document.getElementById('status');
+        status.textContent = 'WASM ready - entering main';
+        status.classList.add('ready');
         window.FireRedApplyTouchState?.();
         this.canvas?.focus();
       },
@@ -69,6 +70,20 @@
         console.error('FireRed aborted:', reason);
       }
     };
+
+    window.addEventListener('error', (event) => {
+      const status = document.getElementById('status');
+      status.textContent = 'Runtime error';
+      status.classList.add('error');
+      console.error('FireRed window error:', event.error || event.message);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      const status = document.getElementById('status');
+      status.textContent = 'Runtime promise error';
+      status.classList.add('error');
+      console.error('FireRed rejected promise:', event.reason);
+    });
   </script>
   <script src="controls.js"></script>
   <script src="game.js"></script>
