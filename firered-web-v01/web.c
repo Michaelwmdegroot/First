@@ -14,6 +14,35 @@
 extern IntrFunc gIntrTable[];
 extern void AgbMain(void);
 
+static unsigned int sRenderedFrames;
+
+EMSCRIPTEN_KEEPALIVE
+void WebBootCheckpoint(const char *stage)
+{
+    EM_ASM({
+        const status = document.getElementById('status');
+        if (status) {
+            status.textContent = UTF8ToString($0);
+            status.classList.remove('error');
+        }
+        console.log('[FireRed boot]', UTF8ToString($0));
+    }, stage);
+}
+
+static void WebBootError(const char *stage, const char *detail)
+{
+    EM_ASM({
+        const status = document.getElementById('status');
+        const stage = UTF8ToString($0);
+        const detail = UTF8ToString($1);
+        if (status) {
+            status.textContent = stage;
+            status.classList.add('error');
+        }
+        console.error('[FireRed boot]', stage, detail);
+    }, stage, detail ? detail : "");
+}
+
 static SDL_Window *sWindow;
 static SDL_Renderer *sRenderer;
 static SDL_Texture *sTexture;
@@ -120,6 +149,9 @@ static void RenderFrame(void)
     SDL_RenderTexture(sRenderer, sTexture, NULL, NULL);
     SDL_RenderPresent(sRenderer);
 
+    if (sRenderedFrames++ == 0)
+        WebBootCheckpoint("First frame");
+
     REG_VCOUNT = 161;
 }
 
@@ -190,13 +222,16 @@ void VBlankIntrWait(void)
 
 int main(void)
 {
+    WebBootCheckpoint("Restoring save");
     ReadSaveFile();
 
     SDL_SetHint(SDL_HINT_EMSCRIPTEN_CANVAS_SELECTOR, "#screen");
+    WebBootCheckpoint("Starting SDL");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
     {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+        WebBootError("SDL init failed", SDL_GetError());
         return 1;
     }
 
@@ -204,6 +239,7 @@ int main(void)
     if (sWindow == NULL)
     {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
+        WebBootError("Window creation failed", SDL_GetError());
         return 1;
     }
 
@@ -211,6 +247,7 @@ int main(void)
     if (sRenderer == NULL)
     {
         fprintf(stderr, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
+        WebBootError("Renderer creation failed", SDL_GetError());
         return 1;
     }
 
@@ -231,12 +268,20 @@ int main(void)
     if (sTexture == NULL)
     {
         fprintf(stderr, "SDL_CreateTexture failed: %s\n", SDL_GetError());
+        WebBootError("Texture creation failed", SDL_GetError());
         return 1;
     }
 
     SDL_SetTextureScaleMode(sTexture, SDL_SCALEMODE_NEAREST);
     SDL_SetRenderDrawColor(sRenderer, 0, 0, 0, 255);
 
+    /* Prove that SDL owns the intended browser canvas before entering FireRed. */
+    SDL_RenderClear(sRenderer);
+    SDL_RenderPresent(sRenderer);
+    WebBootCheckpoint("SDL ready - booting FireRed");
+
     AgbMain();
+
+    WebBootError("FireRed main returned", "AgbMain should not return");
     return 0;
 }
