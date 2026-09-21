@@ -65,7 +65,9 @@
       },
       onAbort(reason) {
         const status = document.getElementById('status');
-        status.textContent = 'Boot error';
+        const detail = String(reason ?? 'unknown abort');
+        status.textContent = 'Abort: ' + detail.replace(/\s+/g, ' ').slice(0, 180);
+        status.title = detail;
         status.classList.add('error');
         console.error('FireRed aborted:', reason);
       }
@@ -73,16 +75,22 @@
 
     window.addEventListener('error', (event) => {
       const status = document.getElementById('status');
-      status.textContent = 'Runtime error';
+      const err = event.error;
+      const detail = err?.stack || err?.message || event.message || 'unknown runtime error';
+      status.textContent = 'Runtime: ' + detail.replace(/\s+/g, ' ').slice(0, 180);
+      status.title = detail;
       status.classList.add('error');
-      console.error('FireRed window error:', event.error || event.message);
+      console.error('FireRed window error:', err || event.message);
     });
 
     window.addEventListener('unhandledrejection', (event) => {
       const status = document.getElementById('status');
-      status.textContent = 'Runtime promise error';
+      const reason = event.reason;
+      const detail = reason?.stack || reason?.message || String(reason ?? 'unknown rejection');
+      status.textContent = 'Runtime: ' + detail.replace(/\s+/g, ' ').slice(0, 180);
+      status.title = detail;
       status.classList.add('error');
-      console.error('FireRed rejected promise:', event.reason);
+      console.error('FireRed rejected promise:', reason);
     });
   </script>
   <script src="controls.js"></script>
