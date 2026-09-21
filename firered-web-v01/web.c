@@ -82,10 +82,10 @@ static void WriteSaveFile(void)
     fclose(save);
 
     EM_ASM({
-        if (typeof FS !== 'undefined') {
-            FS.syncfs(false, function (err) {
-                if (err) console.error("FireRed save sync failed", err);
-            });
+        if (typeof Module.fireRedRequestSaveSync === 'function') {
+            Module.fireRedRequestSaveSync();
+        } else {
+            console.error("FireRed save sync helper is unavailable");
         }
     });
 }
