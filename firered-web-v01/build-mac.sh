@@ -220,6 +220,58 @@ s = s.replace('(&REG_DMA0DAD)[dmaNum * 3] = dest;',
               '(&REG_DMA0DAD)[dmaNum * 3] = (u32)(uintptr_t)dest;')
 p.write_text(s)
 
+# WebAssembly function types are strict. FireRed exposes 2-argument Pokemon
+# getters as GCC aliases of 3-argument functions on native builds. Replace
+# those aliases with real wrappers for WEB so wasm-ld sees the correct ABI.
+p = root / "src/pokemon.c"
+s = p.read_text()
+old = 'u32 GetMonData2(struct Pokemon *mon, s32 field) __attribute__((alias("GetMonData3")));'
+new = '''#ifdef WEB
+u32 GetMonData2(struct Pokemon *mon, s32 field)
+{
+    return GetMonData3(mon, field, NULL);
+}
+#else
+u32 GetMonData2(struct Pokemon *mon, s32 field) __attribute__((alias("GetMonData3")));
+#endif'''
+if s.count(old) != 1:
+    raise RuntimeError(f"Expected one GetMonData2 alias, found {s.count(old)}")
+s = s.replace(old, new, 1)
+
+old = 'u32 GetBoxMonData2(struct BoxPokemon *boxMon, s32 field) __attribute__((alias("GetBoxMonData3")));'
+new = '''#ifdef WEB
+u32 GetBoxMonData2(struct BoxPokemon *boxMon, s32 field)
+{
+    return GetBoxMonData3(boxMon, field, NULL);
+}
+#else
+u32 GetBoxMonData2(struct BoxPokemon *boxMon, s32 field) __attribute__((alias("GetBoxMonData3")));
+#endif'''
+if s.count(old) != 1:
+    raise RuntimeError(f"Expected one GetBoxMonData2 alias, found {s.count(old)}")
+s = s.replace(old, new, 1)
+p.write_text(s)
+
+# These callers lacked the headers that declare the actual helper signatures.
+# Native C accepted implicit-int declarations; WebAssembly needs exact types.
+p = root / "src/clear_save_data_screen.c"
+s = p.read_text()
+if '#include "platform.h"\n' not in s:
+    anchor = '#include "global.h"\n'
+    if s.count(anchor) != 1:
+        raise RuntimeError("clear_save_data_screen.c include anchor changed")
+    s = s.replace(anchor, anchor + '#include "platform.h"\n', 1)
+p.write_text(s)
+
+p = root / "src/pokemon_storage_system_tasks.c"
+s = p.read_text()
+if '#include "menu_helpers.h"\n' not in s:
+    anchor = '#include "global.h"\n'
+    if s.count(anchor) != 1:
+        raise RuntimeError("pokemon_storage_system_tasks.c include anchor changed")
+    s = s.replace(anchor, anchor + '#include "menu_helpers.h"\n', 1)
+p.write_text(s)
+
 # The RFU interrupt source contains three ARM matching helpers marked NAKED.
 # Their bodies are ordinary C callback forwarding; WebAssembly has no ARM
 # prologue/epilogue requirement, and Clang rejects C statements in naked
