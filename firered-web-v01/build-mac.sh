@@ -214,6 +214,19 @@ if s.count(old) != 1:
     raise RuntimeError(f"Expected exactly one HydroPumpHitSplats whitespace label, found {s.count(old)}")
 s = s.replace(old, new, 1)
 p.write_text(s)
+
+# FireRed's music player table contains a legacy standalone .bss directive
+# immediately followed by .rodata with no symbols/data in between. GNU as
+# accepts it, but LLVM's wasm assembler does not. Remove only that empty
+# section switch in the temporary checkout.
+p = root / "sound/music_player_table.inc"
+s = p.read_text()
+old = "\n\t.bss\n\n\t.section .rodata\n"
+new = "\n\t.section .rodata\n"
+if s.count(old) != 1:
+    raise RuntimeError(f"Expected exactly one empty FireRed .bss switch, found {s.count(old)}")
+s = s.replace(old, new, 1)
+p.write_text(s)
 PY
 
 section "Install pinned WASM data/asset helpers"
