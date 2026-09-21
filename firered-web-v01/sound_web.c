@@ -26,6 +26,13 @@ struct MusicPlayerTrack gMPlayTrack_SE3[1] = {0};
 
 u8 gMPlayMemAccArea[0x10] = {0};
 
+/*
+ * V0.1 keeps audio silent, so generated song bodies are intentionally not
+ * linked. Overworld uses this one header address only as an identity check.
+ * Keep a unique, inert header symbol for that comparison.
+ */
+const struct SongHeader mus_victory_gym_leader = {0};
+
 static u16 sCurrentMapMusic;
 static u16 sFanfareFrames;
 static u16 sSeFrames;
@@ -403,6 +410,12 @@ bool8 IsBGMPlaying(void) { return !IsBGMStopped(); }
 bool8 IsSpecialSEPlaying(void) { return sSeFrames != 0; }
 void SetBGMVolume_SuppressHelpSystemReduction(u16 volume) { (void)volume; }
 void BGMVolumeMax_EnableHelpSystemReduction(void) {}
+
+void SetPokemonCryStereo(u32 val)
+{
+    /* Browser V0.1 has no hardware stereo routing; keep the API state-safe. */
+    (void)val;
+}
 
 void SetPokemonCryPriority(u8 val)
 {
