@@ -200,6 +200,20 @@ if s.count(old) != 1:
     raise RuntimeError(f"Expected exactly one FireRed setstatchanger legacy call, found {s.count(old)}")
 s = s.replace(old, new, 1)
 p.write_text(s)
+
+# FireRed has one battle-animation label with legacy whitespace before the
+# colon ("HydroPumpHitSplats\t:"). GNU as accepts it, but the pinned WASM
+# converter only recognizes labels whose colon immediately follows the name,
+# so it fails to emit the .type/.size metadata LLVM requires for data symbols.
+# Normalize only this verified source spelling in the temporary checkout.
+p = root / "data/battle_anim_scripts.s"
+s = p.read_text()
+old = "HydroPumpHitSplats\t:"
+new = "HydroPumpHitSplats:"
+if s.count(old) != 1:
+    raise RuntimeError(f"Expected exactly one HydroPumpHitSplats whitespace label, found {s.count(old)}")
+s = s.replace(old, new, 1)
+p.write_text(s)
 PY
 
 section "Install pinned WASM data/asset helpers"
