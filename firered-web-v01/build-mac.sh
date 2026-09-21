@@ -263,12 +263,35 @@ if '#include "platform.h"\n' not in s:
     s = s.replace(anchor, anchor + '#include "platform.h"\n', 1)
 p.write_text(s)
 
+# Normal menu saves call Platform_StoreSaveFile directly from save.c.
+# Without platform.h Clang gives that call an implicit int return type, which
+# becomes a strict wasm function-type mismatch against the real void function.
+p = root / "src/save.c"
+s = p.read_text()
+if '#include "platform.h"\n' not in s:
+    anchor = '#include "global.h"\n'
+    if s.count(anchor) != 1:
+        raise RuntimeError("save.c include anchor changed")
+    s = s.replace(anchor, anchor + '#include "platform.h"\n', 1)
+p.write_text(s)
+
 p = root / "src/pokemon_storage_system_tasks.c"
 s = p.read_text()
 if '#include "menu_helpers.h"\n' not in s:
     anchor = '#include "global.h"\n'
     if s.count(anchor) != 1:
         raise RuntimeError("pokemon_storage_system_tasks.c include anchor changed")
+    s = s.replace(anchor, anchor + '#include "menu_helpers.h"\n', 1)
+p.write_text(s)
+
+# Trainer Card also calls SetVBlankHBlankCallbacksToNull. Give it the same
+# declared void signature so wasm-ld does not generate a second ABI mismatch.
+p = root / "src/trainer_card.c"
+s = p.read_text()
+if '#include "menu_helpers.h"\n' not in s:
+    anchor = '#include "global.h"\n'
+    if s.count(anchor) != 1:
+        raise RuntimeError("trainer_card.c include anchor changed")
     s = s.replace(anchor, anchor + '#include "menu_helpers.h"\n', 1)
 p.write_text(s)
 
