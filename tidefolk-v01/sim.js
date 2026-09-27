@@ -2,18 +2,48 @@
 class TideSim {
  constructor(saved=null){
   this.dirty=true; this.revision=0; this.acc=0; this.onEvent=()=>{}; this.pathCache=null;
-  if(saved){this.s=saved;this.s.paused=true;this.s.speed=1;this.s.people.forEach(p=>{p.route=[];p.targetKey=null;});return;}
+  if(saved){this.s=saved;this.s.version=2;this.s.paused=true;this.s.speed=1;this.s.settings=this.s.settings||{};if(!BALANCE.dayLengths.includes(this.s.settings.daySeconds))this.s.settings.daySeconds=BALANCE.secondsPerDay;expandIsland(this.s.world);this.s.people.forEach(p=>{p.route=[];p.targetKey=null;});return;}
   const stock={};Object.keys(GOODS).forEach(k=>stock[k]=0);stock.food=BALANCE.initialRations;stock.tools=2;
-  this.s={version:1,seed:8222026,day:1,time:.28,speed:1,paused:true,started:false,stock,
+  this.s={version:2,seed:8222026,day:1,time:.28,speed:1,paused:true,started:false,stock,
     people:[],buildings:[],paths:[],world:makeWorld(),nextId:1,insight:0,pendingInsight:0,
     known:[],pendingDiscoveries:[],flags:{},awards:{},logs:[],freshBatches:[],pendingArrival:null,
     lastArrival:0,councilCount:0,councilNotice:false,boat:{stage:'none',progress:0,crew:[],name:'The Hope'},
     policies:{wood:35,fresh:20,food:80},stats:{produced:{},consumed:{},yesterday:{},dayProduced:{},dayUsed:{}},
-    settings:{sound:false,quality:'auto'},demo:false};
+    settings:{sound:false,quality:'auto',daySeconds:BALANCE.secondsPerDay},demo:false};
   [['Tomas','Vale','m',28,'#be7858','Tool roll'],['Mara','Reed','f',26,'#dfa55a','Cooking pot'],['Elias','Finch','m',31,'#587e86','Hand axe'],['Lena','Moss','f',25,'#838f60','Utility knife']].forEach((a,i)=>this.addPerson(...a,-1+i*.7,7));
   this.log('The first shore','Four people, one island, and a chance to begin again.','compass');
  }
- get day(){return this.s.day;} get season(){return Math.floor((this.s.day-1)/30)%4;}
+ get day(){return this.s.day;}
+ get daySeconds(){return BALANCE.dayLengths.includes(this.s.settings?.daySeconds)?this.s.settings.daySeconds:BALANCE.secondsPerDay;}
+ knownAt(x,z){return regionKnown(this.s,x,z);}
+ region(id){return REGIONS.find(r=>r.id===id);}
+ explored(id){return this.s.world.explored.includes(id);}
+ scoutFor(id){return this.people.find(p=>p.task?.kind==='scout'&&p.task.region===id);}
+ scoutReason(id){let r=this.region(id);if(!r||id==='home')return 'This is our home shore.';if(this.explored(id))return 'We have already explored this area.';if(this.scoutFor(id))return 'A scout is already on the trail.';if(!this.has('hearth'))return 'Build the Founding Hearth before heading inland.';let missing=r.requires.filter(q=>!this.explored(q));if(missing.length)return 'First explore '+missing.map(q=>this.region(q).name).join(' and ')+'.';return '';}
+ orderScout(id,pId=null){
+  let reason=this.scoutReason(id);if(reason)return reason;
+  let candidates=this.people.filter(p=>this.available(p)&&!p.task?.manual&&p.task?.kind!=='deliver'&&(!pId||p.id===pId));
+  candidates.sort((a,b)=>Number(!!a.job)-Number(!!b.job)||dist(a,this.region(id))-dist(b,this.region(id)));
+  const p=candidates[0],r=this.region(id);if(!p)return 'No adult is free. Let someone finish carrying supplies, or free a worker.';
+  p.task=this.makeTask('scout',r,.18,{manual:true,region:id});p.route=[];p.targetKey=null;
+  this.log(p.first+' is following a new trail','Destination: '+r.name+'. Work resumes after the expedition.','compass');this.dirty=true;return '';
+ }
+ cancelScout(id){let p=this.scoutFor(id);if(!p)return;p.task=null;p.route=[];this.log('Returning to the familiar shore',p.first+' has stopped exploring for now.','compass');}
+ finishScout(p,t){
+  if(this.explored(t.region))return;const r=this.region(t.region);this.s.world.explored.push(r.id);
+  this.s.world.explorationLog.push({region:r.id,person:p.id,name:p.first,day:this.day});
+  this.record(p,'Explored '+r.name+' and opened its trails to the community.');
+  this.award('explore_'+r.id,p.first+' discovered '+r.name,2);
+  this.log('Beyond the familiar shore',r.name+' is now open. Inspect its resources in Explore; supplies still need to be gathered and carried home.','compass');this.dirty=true;
+ }
+ gatherCache(p,t,dt){
+  if(!this.travel(p,t,dt)){p.status='Walking to gather supplies';return;}
+  p.status='Gathering island resources';t.done+=dt/.5*this.capacity(p);this.xp(p,'foraging',dt*.7);
+  if(t.done<t.work)return;let n=this.s.world.nodes.find(n=>n.id===t.node),cargo={};
+  if(n&&n.left>0){n.left--;cargo[n.resource]=n.amount;this.dirty=true;}
+  const store=this.buildings.find(b=>b.type==='store'&&b.built);p.task=Object.keys(cargo).length?this.makeTask('deliver',store?this.workTarget(store):this.hearthPos(),0,{cargo}):null;p.route=[];
+ }
+ get season(){return Math.floor((this.s.day-1)/30)%4;}
  get year(){return Math.floor((this.s.day-1)/120)+1;}
  get seasonDay(){return (this.s.day-1)%30+1;}
  get night(){return this.s.time>=.76||this.s.time<.23;}
@@ -58,7 +88,7 @@ class TideSim {
  setHome(pId,bId){let p=this.people.find(q=>q.id===pId),b=this.getB(bId);if(!p||!b||!b.built||!this.beds(b))return 'Choose a completed home.';if(this.freeBeds(b)<(p.pregnantUntil?2:1)&&p.home!==bId)return 'There are no free beds.';if(p.pregnantUntil&&b.type!=='house')return 'An expecting household needs a permanent home.';p.home=bId;p.task=null;this.record(p,'Moved into '+this.buildingName(b)+'.');return '';}
  buildingName(b){return b.up&&BUILD[b.type].up?BUILD[b.type].up.name:BUILD[b.type].name;}
  placement(type,x,z,ignoreId=null){let d=BUILD[type];if(!d)return 'Unknown building.';if(!this.learned(d.tech))return 'Learn '+TECH[d.tech].name+' at the Hearth first.';
-  if(d.unique&&this.buildings.some(b=>b.type===type&&b.id!==ignoreId))return 'The community already has one.';let r=landRatio(x,z);if(r>.91||r<0)return 'Choose dry, buildable ground.';if(d.coast&&r<.62)return 'This building needs to be close to the shore.';
+  if(d.unique&&this.buildings.some(b=>b.type===type&&b.id!==ignoreId))return 'The community already has one.';if(!this.knownAt(x,z))return 'Explore this area before building here.';let r=landRatio(x,z);if(r>.91||r<0)return 'Choose dry, buildable ground.';if(d.coast&&r<.62)return 'This building needs to be close to the shore.';
   if(this.buildings.some(b=>b.id!==ignoreId&&Math.hypot(x-b.x,z-b.z)<d.size+BUILD[b.type].size+.3))return 'Leave a little space between buildings.';
   if(this.s.world.nodes.some(n=>['spring','stone','copper','lookout'].includes(n.id)&&Math.hypot(x-n.x,z-n.z)<d.size+1))return 'Leave this landmark accessible.';
   return '';
@@ -72,9 +102,9 @@ class TideSim {
  upgrade(id){let b=this.getB(id),u=b&&BUILD[b.type].up;if(!u||b.up)return 'There is no further first-island upgrade.';if(!this.learned(u.tech))return 'Learn '+TECH[u.tech].name+' first.';if(!this.canPay(u.cost))return 'Need '+this.missing(u.cost);if(u.cost.fittings&&this.s.boat.stage==='none'&&this.s.stock.fittings+(this.s.stock.ore+(this.s.oreLeft??40))/2-u.cost.fittings<6)return 'Keep six fittings available for the first vessel.';this.pay(u.cost);b.up=true;if(b.type==='woodpost')for(let t of this.s.world.trees)if(t.wood<=0&&!t.regrow&&dist(t,b)<8&&!this.buildings.some(q=>dist(q,t)<BUILD[q.type].size+.4))t.regrow=this.day+90;this.dirty=true;this.log(u.name,'The community can do a little more now.','spark');return '';}
  researchReason(id){let t=TECH[id];if(!t)return 'Unknown idea.';if(this.learned(id))return 'Already learned.';let missing=t.req.filter(r=>!this.learned(r));if(missing.length)return 'First learn '+missing.map(r=>TECH[r].name).join(' and ')+'.';if(t.event&&!this.s.flags[t.event])return 'First discover: '+t.event.replaceAll('_',' ')+'.';if(!this.has('hearth'))return 'Build the Hearth first.';if(!this.night)return 'Share this idea at the Hearth tonight.';if(this.s.insight<t.cost)return `Need ${t.cost-this.s.insight} more insight.`;return '';}
  research(id){let err=this.researchReason(id);if(err)return err;this.s.insight-=TECH[id].cost;this.s.known.push(id);this.log('We learned '+TECH[id].name.toLowerCase(),TECH[id].desc,'spark');this.dirty=true;return '';}
- orderNode(id,pId=null){let n=this.s.world.nodes.find(n=>n.id===id);if(!n)return 'Nothing to investigate.';if(n.kind==='discover'&&n.found)return 'This place is already known.';if(this.people.some(p=>p.task?.manual&&p.task.node===id))return 'Someone is already heading there.';let candidates=this.people.filter(p=>this.available(p)&&!p.task?.manual&&p.task?.kind!=='deliver'&&(!pId||p.id===pId));candidates.sort((a,b)=>Number(!!a.job)-Number(!!b.job)||dist(a,n)-dist(b,n));let p=candidates[0];if(!p)return 'No one is free to go right now.';
-  p.task={kind:n.kind==='discover'?'discover':'gatherNode',node:id,x:n.x,z:n.z,work:n.kind==='discover'?.20:.16,done:0,manual:true};p.route=[];p.status='Heading to '+n.name.toLowerCase();this.dirty=true;return '';}
- nearestTree(p){return this.s.world.trees.filter(t=>t.wood>0).sort((a,b)=>dist(a,p)-dist(b,p))[0];}
+ orderNode(id,pId=null){let n=this.s.world.nodes.find(n=>n.id===id);if(!n)return 'Nothing to investigate.';if(!this.knownAt(n.x,n.z))return 'Explore '+this.region(regionAt(n.x,n.z)).name+' before investigating this resource.';if(n.left===0)return 'These supplies have been gathered.';if(n.kind==='discover'&&n.found)return 'This place is already known.';if(this.people.some(p=>p.task?.manual&&p.task.node===id))return 'Someone is already heading there.';let candidates=this.people.filter(p=>this.available(p)&&!p.task?.manual&&p.task?.kind!=='deliver'&&(!pId||p.id===pId));candidates.sort((a,b)=>Number(!!a.job)-Number(!!b.job)||dist(a,n)-dist(b,n));let p=candidates[0];if(!p)return 'No one is free to go right now.';
+  p.task={kind:n.kind==='discover'?'discover':n.kind==='cache'?'cache':'gatherNode',node:id,x:n.x,z:n.z,work:n.kind==='discover'?.20:.16,done:0,manual:true};p.route=[];p.status='Heading to '+n.name.toLowerCase();this.dirty=true;return '';}
+ nearestTree(p){return this.s.world.trees.filter(t=>t.wood>0&&this.knownAt(t.x,t.z)).sort((a,b)=>dist(a,p)-dist(b,p))[0];}
  workTarget(b){return{x:b.x,z:b.z+BUILD[b.type].size+.22};}
  makeTask(kind,target,work,extra={}){return{kind,x:target.x,z:target.z,work,done:0,...extra};}
  chooseTask(p){
@@ -103,19 +133,21 @@ class TideSim {
   return null;
  }
  navValid(x,z){if(landRatio(x,z)>.99)return false;for(let b of this.buildings){if(['field','bench','lamp','hearth'].includes(b.type))continue;let r=BUILD[b.type].size*.78;if(Math.abs(x-b.x)<r&&Math.abs(z-b.z)<r)return false;}return true;}
- findPath(start,end){const cell=.75,key=(x,z)=>x+','+z;let sx=Math.round(start.x/cell),sz=Math.round(start.z/cell),ex=Math.round(end.x/cell),ez=Math.round(end.z/cell);
+ findPath(start,end){
+  if(!this.s.paths.length){let clear=true,n=Math.ceil(dist(start,end)/.45);for(let i=1;i<=n;i++){let k=i/n;if(!this.navValid(start.x+(end.x-start.x)*k,start.z+(end.z-start.z)*k)){clear=false;break;}}if(clear)return[{x:end.x,z:end.z}];}
+  const cell=.75,key=(x,z)=>x+','+z;let sx=Math.round(start.x/cell),sz=Math.round(start.z/cell),ex=Math.round(end.x/cell),ez=Math.round(end.z/cell);
   // A small eight-connected grid keeps people out of houses; paths reduce travel cost.
   let open=[{x:sx,z:sz,g:0,f:0}],seen=new Map(),closed=new Set();seen.set(key(sx,sz),open[0]);let best=null,count=0;
-  while(open.length&&count++<2300){open.sort((a,b)=>a.f-b.f);let a=open.shift(),k=key(a.x,a.z);if(closed.has(k))continue;closed.add(k);if(Math.hypot(a.x-ex,a.z-ez)<=1){best=a;break;}
-   for(let [dx,dz]of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){let x=a.x+dx,z=a.z+dz,nk=key(x,z);if(Math.abs(x)>24||Math.abs(z)>23||closed.has(nk)||!this.navValid(x*cell,z*cell))continue;if(dx&&dz&&(!this.navValid((a.x+dx)*cell,a.z*cell)||!this.navValid(a.x*cell,(a.z+dz)*cell)))continue;
+  while(open.length&&count++<10000){open.sort((a,b)=>a.f-b.f);let a=open.shift(),k=key(a.x,a.z);if(closed.has(k))continue;closed.add(k);if(Math.hypot(a.x-ex,a.z-ez)<=1){best=a;break;}
+   for(let [dx,dz]of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){let x=a.x+dx,z=a.z+dz,nk=key(x,z);if(Math.abs(x)>48||z< -64||z>24||closed.has(nk)||!this.navValid(x*cell,z*cell))continue;if(dx&&dz&&(!this.navValid((a.x+dx)*cell,a.z*cell)||!this.navValid(a.x*cell,(a.z+dz)*cell)))continue;
     let onPath=this.s.paths.some(path=>path.some(p=>Math.hypot(p.x-x*cell,p.z-z*cell)<.65));let g=a.g+Math.hypot(dx,dz)*(onPath?.78:1),old=seen.get(nk);if(old&&old.g<=g)continue;let n={x,z,g,f:g+Math.hypot(x-ex,z-ez)*.75,prev:a};seen.set(nk,n);open.push(n);}
   }
-  if(!best)return[{x:end.x,z:end.z}];let route=[{x:end.x,z:end.z}];while(best.prev){route.push({x:best.x*cell,z:best.z*cell});best=best.prev;}route.reverse();return route;
+  if(!best)return [];let route=[{x:end.x,z:end.z}];while(best.prev){route.push({x:best.x*cell,z:best.z*cell});best=best.prev;}route.reverse();return route;
  }
  travel(p,target,dt){if(Math.hypot(p.x-target.x,p.z-target.z)<.18){p.route=[];return true;}
   if(!p.route?.length||p.targetKey!==`${target.x.toFixed(1)},${target.z.toFixed(1)}`){p.route=this.findPath(p,target);p.targetKey=`${target.x.toFixed(1)},${target.z.toFixed(1)}`;}
-  let budget=dt*150;while(p.route.length&&budget>0){let n=p.route[0],dx=n.x-p.x,dz=n.z-p.z,d=Math.hypot(dx,dz);if(d<=budget){p.x=n.x;p.z=n.z;p.route.shift();budget-=d;}else{p.x+=dx/d*budget;p.z+=dz/d*budget;budget=0;}p.facing=Math.atan2(dx,dz);}
-  return p.route.length===0;
+  let budget=dt*BALANCE.walkPerDay;while(p.route.length&&budget>0){let n=p.route[0],dx=n.x-p.x,dz=n.z-p.z,d=Math.hypot(dx,dz);if(d<=budget){p.x=n.x;p.z=n.z;p.route.shift();budget-=d;}else{p.x+=dx/d*budget;p.z+=dz/d*budget;budget=0;}p.facing=Math.atan2(dx,dz);}
+  return Math.hypot(p.x-target.x,p.z-target.z)<.18;
  }
  tickPerson(p,dt){
   if(this.s.boat.crew.includes(p.id)&&['sailing','arrived'].includes(this.s.boat.stage)){p.status='On the first voyage';return;}
@@ -127,6 +159,9 @@ class TideSim {
   if(!this.available(p)){p.status=p.pregnantUntil?'Expecting a child':p.recoveryUntil>this.day?'Resting and recovering':stage==='Child'?'Learning and playing':'Learning';let school=this.buildings.find(b=>b.type==='school'&&b.built);this.travel(p,stage==='Child'&&school?this.workTarget(school):{x:h.x+1.7,z:h.z+1.8},dt);return;}
   if(this.s.time<.26){p.status='Breakfast';this.travel(p,h,dt);return;}
   if(!p.task)p.task=this.chooseTask(p);
+  if(p.task?.kind==='scout'){const t=p.task;if(!this.travel(p,t,dt)){p.status='Exploring the trail to '+this.region(t.region).name;return;}p.status='Surveying '+this.region(t.region).name;t.done+=dt/.5*this.capacity(p);this.xp(p,'foraging',dt);if(t.done>=t.work){this.finishScout(p,t);p.task=this.makeTask('return',this.hearthPos(),0,{manual:true});p.route=[];}return;}
+  if(p.task?.kind==='return'){p.status='Returning from the expedition';if(this.travel(p,p.task,dt))p.task=null;return;}
+  if(p.task?.kind==='cache'){this.gatherCache(p,p.task,dt);return;}
   let t=p.task;if(!t){p.status=this.getB(p.job)&&['workshop','forge','smoker'].includes(this.getB(p.job).type)?(this.usedStorage()>=this.stockCap()-5?'Storage is full':'Waiting for recipe materials'):'Taking a little time';let a=(hash(p.id)%600)/100;this.travel(p,{x:h.x+Math.cos(a)*2,z:h.z+Math.sin(a)*2},dt);return;}
   if(!this.travel(p,t,dt)){p.status=t.kind==='deliver'?'Carrying supplies home':'Walking to '+(t.manual?'explore':t.kind==='build'?'the building site':'work');return;}
   if(t.kind==='deliver'){for(let[k,v]of Object.entries(t.cargo))this.add(k,v);p.task=null;this.dirty=true;return;}
@@ -197,11 +232,11 @@ class TideSim {
   for(let p of this.people)this.tickPerson(p,dt);
   if(this.s.boat.stage==='sailing'){this.s.boat.travel+=dt;if(this.s.boat.travel>=2){this.s.boat.stage='arrived';this.s.paused=true;this.award('new_shore','A new shore',5);this.log('Land beyond the horizon','A copper-rich island lies ahead. Your first chapter is complete.','compass');this.dirty=true;}}
  }
- advance(seconds){if(this.s.paused||!this.s.started)return;this.acc+=Math.min(seconds,.15)*this.s.speed/BALANCE.secondsPerDay;let count=0;while(this.acc>=BALANCE.tick&&count++<120){this.tick(BALANCE.tick);this.acc-=BALANCE.tick;}}
+ advance(seconds){if(this.s.paused||!this.s.started)return;this.acc+=Math.min(seconds,.15)*this.s.speed/this.daySeconds;let count=0;while(this.acc>=BALANCE.tick&&count++<120){this.tick(BALANCE.tick);this.acc-=BALANCE.tick;}}
  runDays(n){const step=BALANCE.tick;for(let i=0;i<Math.round(n/step);i++)this.tick(step);this.dirty=true;}
  meetTonight(){let d=this.s.time<.79?.8-this.s.time:1.8-this.s.time;this.runDays(d);this.s.paused=true;return '';}
  toJSON(){let o=JSON.parse(JSON.stringify(this.s));o.people.forEach(p=>{p.route=[];p.targetKey=null;});return o;}
- static validate(data){if(!data||data.version!==1||!Number.isFinite(data.day)||data.day<1||data.day>100000||!data.stock||!Array.isArray(data.people)||data.people.length>80||!Array.isArray(data.buildings)||data.buildings.length>300||!data.world||!Array.isArray(data.known))throw Error('This is not a compatible Tidefolk save.');for(let [k,v]of Object.entries(data.stock))if(!(k in GOODS)||!Number.isFinite(v)||v<0)throw Error('Invalid resource data.');for(let b of data.buildings)if(!(b.type in BUILD)||!Number.isFinite(b.x)||!Number.isFinite(b.z))throw Error('Invalid building data.');return data;}
+ static validate(data){if(!data||![1,2].includes(data.version)||!Number.isFinite(data.day)||data.day<1||data.day>100000||!data.stock||!Array.isArray(data.people)||data.people.length>80||!Array.isArray(data.buildings)||data.buildings.length>300||!data.world||!Array.isArray(data.known))throw Error('This is not a compatible Tidefolk save.');if(!Array.isArray(data.world.trees)||!Array.isArray(data.world.nodes)||!Number.isFinite(data.time)||data.time<0||data.time>=1)throw Error('Invalid island data.');if(data.version===2&&(!Array.isArray(data.world.explored)||data.world.explored.some(id=>!REGIONS.some(r=>r.id===id))))throw Error('Invalid exploration data.');for(let [k,v]of Object.entries(data.stock))if(!(k in GOODS)||!Number.isFinite(v)||v<0)throw Error('Invalid resource data.');for(let b of data.buildings)if(!(b.type in BUILD)||!Number.isFinite(b.x)||!Number.isFinite(b.z))throw Error('Invalid building data.');return data;}
 }
 const GOALS=[
  {id:'g_salvage',title:'What the sea gave back',desc:'Send a castaway to recover supplies from the broken vessel.',test:s=>s.s.flags.salvaged,action:'node:wreck',label:'Find the wreck',reward:1},
@@ -214,7 +249,7 @@ const GOALS=[
  {id:'g_people',title:'Leave a light on',desc:'Build a Signal Fire and welcome a new survivor into the community.',test:s=>s.has('signal')&&s.people.length>4,action:'people',label:'Our people',reward:2},
  {id:'g_craft',title:'Made by our own hands',desc:'Build a Workshop and a Water Station. Upgrade a Woodcutter Post to manage the forest.',test:s=>s.has('workshop')&&s.has('water')&&s.buildings.some(b=>b.type==='woodpost'&&b.up),action:'build',label:'Grow the settlement',reward:3},
  {id:'g_winter',title:'For the colder days',desc:'Keep 60 preserved food and 55 wood in reserve. A Smokehouse will help.',test:s=>s.s.stock.food>=60&&s.s.stock.wood>=55,action:'supplies',label:'Plan our reserves',reward:3},
- {id:'g_horizon',title:'A shape on the horizon',desc:'Explore the lookout and copper outcrop. Learn Shorecraft and practise on the water.',test:s=>s.s.flags.lookout&&s.s.flags.copper&&s.learned('shorecraft'),action:'node:lookout',label:'Look beyond home',reward:3},
+ {id:'g_horizon',title:'A shape on the horizon',desc:'Send scouts through Greyback Ridge to Farwatch Headland. Discover copper and the lookout; learn Shorecraft.',test:s=>s.s.flags.lookout&&s.s.flags.copper&&s.learned('shorecraft'),action:'node:lookout',label:'Look beyond home',reward:3},
  {id:'g_vessel',title:'Build what carries us',desc:'Learn Boatbuilding, prepare the materials and train a builder. Construct a vessel at the Boatyard.',test:s=>['ready','sailing','arrived'].includes(s.s.boat.stage),action:'voyage',label:'The first vessel',reward:3},
  {id:'g_voyage',title:'A new shore',desc:'Provision the vessel, choose two crew, and follow the horizon.',test:s=>s.s.boat.stage==='arrived',action:'voyage',label:'Prepare the voyage',reward:0}
 ];

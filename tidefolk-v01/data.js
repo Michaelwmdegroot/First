@@ -1,8 +1,8 @@
 'use strict';
 /* Tidefolk: First Hearth. All prototype tuning lives here, not in presentation. */
-const BALANCE = Object.freeze({version:1, daysPerSeason:30, secondsPerDay:90, tick:1/480,
+const BALANCE = Object.freeze({version:2, daysPerSeason:30, secondsPerDay:360, tick:1/960,
   maxCitizens:18, workStart:.26, workEnd:.76, pregnancyDays:90, recoveryDays:5,
-  speeds:[1,4,12], initialRations:12, treeWood:8, treeRegrowth:90,
+  speeds:[1,2,4], dayLengths:[360,600,900], walkPerDay:240, initialRations:12, treeWood:8, treeRegrowth:90,
   seasonNames:['Spring','Summer','Autumn','Winter'],
   foodRates:[1,1,.95,.78], skillXP:.45, boatWork:12});
 const GOODS = {
@@ -70,10 +70,12 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const hash=(a)=>{let h=2166136261;for(let i=0;i<String(a).length;i++)h=Math.imul(h^String(a).charCodeAt(i),16777619);return h>>>0;};
 const rand=(seed)=>{let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=Math.imul(a^a>>>15,1|a);t^=t+Math.imul(t^t>>>7,61|t);return((t^t>>>14)>>>0)/4294967296;};};
-function radiusAt(a){return 15.2+1.1*Math.sin(3*a+.8)+.65*Math.cos(5*a)+.45*Math.sin(7*a);}
+function starterRadiusAt(a){return 15.2+1.1*Math.sin(3*a+.8)+.65*Math.cos(5*a)+.45*Math.sin(7*a);}
+function radiusAt(a){return starterRadiusAt(a)+Math.max(0,-Math.sin(a))*(38+3*Math.sin(5*a)+1.6*Math.cos(7*a));}
+function starterLandRatio(x,z){let a=Math.atan2(z/.82,x);return Math.hypot(x,z/.82)/starterRadiusAt(a);}
 function landRatio(x,z){let a=Math.atan2(z/.82,x);return Math.hypot(x,z/.82)/radiusAt(a);}
 function groundY(x,z){let r=landRatio(x,z);return r<.87?.55:r<1? .55*(1-(r-.87)/.13):-.10;}
-function makeWorld(){const rng=rand(8222026),trees=[];for(let i=0;i<220&&trees.length<68;i++){let x=(rng()-.5)*29,z=(rng()-.5)*23,r=landRatio(x,z);if(r<.78&&r>.13&&(z<-3.1||x>7.5||x<-9.2)&&Math.hypot(x+7,z+5)>2.2&&Math.hypot(x-6,z+7)>2)trees.push({id:'tree'+i,x,z,size:.7+rng()*.6,wood:8,regrow:0});}
+function makeStarterWorld(){const rng=rand(8222026),trees=[];for(let i=0;i<220&&trees.length<68;i++){let x=(rng()-.5)*29,z=(rng()-.5)*23,r=landRatio(x,z);if(r<.78&&r>.13&&(z<-3.1||x>7.5||x<-9.2)&&Math.hypot(x+7,z+5)>2.2&&Math.hypot(x-6,z+7)>2)trees.push({id:'tree'+i,x,z,size:.7+rng()*.6,wood:8,regrow:0});}
  return {trees,nodes:[
  {id:'wreck',name:'The broken vessel',icon:'basket',x:-2,z:10.7,kind:'salvage',left:3,desc:'Planks, sail scraps, a few things the sea gave back.'},
  {id:'drift',name:'Driftwood',icon:'log',x:5,z:10,kind:'drift',left:20,desc:'Loose timber. Gather it by hand.'},
@@ -85,3 +87,48 @@ function makeWorld(){const rng=rand(8222026),trees=[];for(let i=0;i<220&&trees.l
  {id:'copper',name:'Copper in the rock',icon:'stone',x:10,z:-4,kind:'discover',found:false,desc:'Something warm-coloured glints in the stone.'},
  {id:'herbs',name:'Wild herb garden',icon:'leaf',x:-11,z:-1,kind:'discover',found:false,desc:'Sweet-smelling leaves beside the woodland.'},
  {id:'lookout',name:'The high lookout',icon:'compass',x:0,z:-10,kind:'discover',found:false,desc:'The highest point. What lies beyond the horizon?'}]};}
+
+// An authored, contiguous island. The original southern beach stays at the same coordinates.
+const REGIONS=Object.freeze([
+ {id:'home',name:'First Light Shore',x:0,z:4,icon:'house',color:'#b9c695',requires:[],hint:'Our landing beach, freshwater and first home.'},
+ {id:'pinewood',name:'Whispering Wood',x:0,z:-16,icon:'leaf',color:'#82a88a',requires:['home'],hint:'A trail leads inland beneath the trees. What grows beyond the clearing?'},
+ {id:'meadow',name:'Sunward Meadow',x:-16,z:-18,icon:'sprout',color:'#c4c68e',requires:['pinewood'],hint:'Warm light falls across an opening beyond the western woods.'},
+ {id:'ridge',name:'Greyback Ridge',x:9,z:-27,icon:'stone',color:'#b1b9b2',requires:['pinewood'],hint:'Pale rock breaks through the trees to the north.'},
+ {id:'cove',name:'Reedwater Cove',x:23,z:-14,icon:'fish',color:'#91beb4',requires:['pinewood'],hint:'Sea birds circle somewhere beyond the eastern treeline.'},
+ {id:'headland',name:'Farwatch Headland',x:-2,z:-38,icon:'compass',color:'#b5b7a4',requires:['ridge'],hint:'The land rises again beyond the ridge. The horizon is waiting.'}
+]);
+const ISLAND_PATCHES=Object.freeze([
+ {id:'wood_berries',name:'Woodland berry bushes',x:-4,z:-17,icon:'food',resource:'fresh',amount:4,left:12,desc:'A sheltered patch of edible berries. A scout has made this trail safe to use.'},
+ {id:'meadow_seeds',name:'Wild grain',x:-16,z:-18,icon:'sprout',resource:'seeds',amount:2,left:6,desc:'Viable grain for planting more fields. Gather a few seed heads and carry them home.'},
+ {id:'meadow_herbs',name:'Wildflower hollow',x:-19,z:-15,icon:'leaf',resource:'herbs',amount:3,left:8,desc:'Medicinal leaves grow in this sunny hollow.'},
+ {id:'ridge_stone',name:'Loose ridge stone',x:12,z:-24,icon:'stone',resource:'stone',amount:5,left:20,desc:'Loose stone can be carried home without building a Stone Yard.'},
+ {id:'cove_reeds',name:'Tall coastal reeds',x:23,z:-13,icon:'leaf',resource:'fiber',amount:6,left:18,desc:'Reeds for roofs and cordage grow along this new shore.'},
+ {id:'cove_food',name:'Tidal shellfish beds',x:24,z:-15,icon:'fish',resource:'fresh',amount:4,left:12,desc:'Gather shellfish from the shallows and bring them back to the community.'}
+]);
+function regionAt(x,z){
+ if(starterLandRatio(x,z)<=1.03)return 'home';
+ let best=REGIONS[1],d=Infinity;
+ for(const r of REGIONS.slice(1)){const n=Math.hypot(x-r.x,z-r.z);if(n<d){d=n;best=r;}}
+ return best.id;
+}
+function regionKnown(state,x,z){return (state.world.explored||['home']).includes(regionAt(x,z));}
+function expandIsland(world){
+ if(world.layout===2)return world;
+ const rng=rand(272026),trees=[];
+ for(let i=0;i<1100&&trees.length<145;i++){
+  const x=(rng()-.5)*60,z=-7-rng()*34,r=landRatio(x,z),region=regionAt(x,z);
+  if(r>.85||region==='home'||REGIONS.some(q=>Math.hypot(q.x-x,q.z-z)<2.4)||ISLAND_PATCHES.some(q=>Math.hypot(q.x-x,q.z-z)<1.5))continue;
+  if((region==='meadow'||region==='ridge')&&rng()<.65)continue;
+  trees.push({id:'north_tree_'+i,x,z,size:.8+rng()*.55,wood:8,regrow:0});
+ }
+ world.trees.push(...trees);
+ for(const p of ISLAND_PATCHES)if(!world.nodes.some(n=>n.id===p.id))world.nodes.push({...p,kind:'cache'});
+ world.layout=2;world.explored=['home'];world.explorationLog=[];return world;
+}
+function makeWorld(){
+ const w=expandIsland(makeStarterWorld());
+ // Existing saves retain their old discoveries and placements. Only new islands use these landmarks.
+ const places={stone:{x:9,z:-27},copper:{x:1,z:-36},lookout:{x:-3,z:-39}};
+ for(const n of w.nodes)if(places[n.id])Object.assign(n,places[n.id]);
+ return w;
+}

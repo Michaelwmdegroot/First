@@ -34,27 +34,40 @@ class IslandView {
  camera(){let span=this.w<700?38:Math.max(47,42*this.w/this.h),width=span/this.zoom,height=width*this.h/this.w;this.px=this.w/width;let c=Math.cos(this.yaw),s=Math.sin(this.yaw),se=Math.sin(this.elev),ce=Math.cos(this.elev);let right=[c,0,-s],up=[-s*se,ce,-c*se],back=[s*ce,se,c*ce];let tx=this.cx,tz=this.cz;this.matrix=new Float32Array([2/width*right[0],2/height*up[0],-back[0]/70,0,0,2/height*up[1],-back[1]/70,0,2/width*right[2],2/height*up[2],-back[2]/70,0,-2/width*(right[0]*tx+right[2]*tz),-2/height*(up[0]*tx+up[2]*tz),.0,1]);}
  project(x,y,z){let m=this.matrix;return{x:(m[0]*x+m[4]*y+m[8]*z+m[12]+1)*this.w/2,y:(1-(m[1]*x+m[5]*y+m[9]*z+m[13]))*this.h/2};}
  ground(sx,sy){let x=(sx-this.w/2)/this.px,v=(this.h/2-sy)/this.px,c=Math.cos(this.yaw),s=Math.sin(this.yaw),h=-(v-.55*Math.cos(this.elev))/Math.sin(this.elev);return{x:c*x+s*h+this.cx,z:-s*x+c*h+this.cz};}
- pan(dx,dy){let c=Math.cos(this.yaw),s=Math.sin(this.yaw);this.cx-=c*dx/this.px+s*dy/(this.px*Math.sin(this.elev));this.cz+=s*dx/this.px-c*dy/(this.px*Math.sin(this.elev));this.cx=clamp(this.cx,-20,20);this.cz=clamp(this.cz,-17,17);this.camera();}
+ pan(dx,dy){let c=Math.cos(this.yaw),s=Math.sin(this.yaw);this.cx-=c*dx/this.px+s*dy/(this.px*Math.sin(this.elev));this.cz+=s*dx/this.px-c*dy/(this.px*Math.sin(this.elev));this.cx=clamp(this.cx,-35,35);this.cz=clamp(this.cz,-48,20);this.camera();}
  shadow(g,x,z,rx,rz,y=.563){g.disk(x+.2,y,z+.2,rx,rz,[.23,.32,.22,.09]);g.disk(x+.2,y+.001,z+.2,rx*.8,rz*.8,[.22,.30,.20,.12]);}
  tree(g,t,season,small=false){let y=groundY(t.x,t.z),s=t.size*(small?.38:1);if(t.wood<=0&&!small){g.cone(t.x,y,t.z,.21,.18,COL.wood,7,.19);return;}this.shadow(g,t.x,t.z,s,s*.75,y+.016);g.at(t.x,y,t.z,0,()=>{
   g.cone(0,0,0,.16*s,1.25*s,COL.wood,7,.09*s);
   let a=season===2?'#c9a367':season===3?'#c9d8cf':'#71935d',b=season===2?'#d7b774':season===3?'#e4e8d7':'#97b875';
   g.ball(0,1.65*s,0,.91*s,.94*s,.84*s,a,7,4);g.ball(-.38*s,1.48*s,.3*s,.53*s,.58*s,.58*s,b,6,3);g.ball(.33*s,2.07*s,-.05*s,.56*s,.64*s,.51*s,b,6,3);
  });}
- terrain(g,season){g.quad([-150,-.3,-150],[-150,-.3,150],[150,-.3,150],[150,-.3,-150],'#6aadae',1);const n=80;
+ terrain(g,season,sim){g.quad([-150,-.3,-150],[-150,-.3,150],[150,-.3,150],[150,-.3,-150],'#6aadae',1);const n=80;
   let rings=[[1.14,-.27,'#83bfba'],[1.085,-.19,'#a3cec2'],[1.035,-.02,'#c5d9c0'],[1,.06,COL.sand],[.955,.22,COL.sand],[.867,.55,season===3?'#c5d1b3':season===2?'#b0b279':COL.grass]];
   for(let r=0;r<rings.length;r++){let [sz,y,col]=rings[r];for(let i=0;i<n;i++){let a=i/n*Math.PI*2,b=(i+1)/n*Math.PI*2,pt=(ang,rad,h)=>[Math.cos(ang)*radiusAt(ang)*rad,h,Math.sin(ang)*radiusAt(ang)*rad*.82];if(r===rings.length-1)g.tri([0,y,0],pt(b,sz,y),pt(a,sz,y),col /* uninterrupted meadow; no radial colour spokes */);else{let next=rings[r+1];g.quad(pt(a,sz,y),pt(b,sz,y),pt(b,next[0],next[1]),pt(a,next[0],next[1]),col);}}
   }
   // An irregular shore is framed with small white foam breaks.
   for(let i=0;i<58;i++){let a=i/58*Math.PI*2,r=radiusAt(a)*1.024;g.at(Math.cos(a)*r,.012,Math.sin(a)*r*.82,-a,()=>g.box(0,0,0,.65,.012,.05,[.88,.94,.84,.5],3));}
-  // The ridge and outcrops leave the central meadow open for building.
-  for(let i=0;i<5;i++){let x=-1+i*.75,z=-9.6+(i%2)*.2;g.ball(x,.65,z,1.1,1.35+i*.09,1.1,season===3?'#cbd4cd':'#a0b0a2',6,3);}
-  for(let i=0;i<6;i++)g.ball(6+(i%3)*.58,.65,-7+Math.floor(i/3)*.54,.65,.4+(i%3)*.25,.6,'#a7b3aa',6,3);
-  g.ball(10,.7,-4,1,.8,.8,'#ae9b7c',7,3);g.ball(10.3,1.0,-3.65,.35,.25,.32,'#bc895e',5,3);
-  g.disk(-7,.563,-5,1.1,.85,'#6da9a6',24,1);g.disk(-7,.57,-5,.65,.55,'#99c9b9',24,1);for(let i=0;i<9;i++){let a=i/9*Math.PI*2;g.ball(-7+Math.cos(a)*1.1,.59,-5+Math.sin(a)*.85,.25,.22,.2,COL.stone,5,3);}
+  // Subtle meadow and ridge clearings give the new land a distinct visual identity.
+  for(const r of REGIONS.slice(1))if(sim.explored(r.id)){
+   if(r.id==='meadow')g.disk(r.x,.552,r.z,6,5,season===3?'#d5decd':'#b1b77e',40);
+   if(r.id==='ridge')g.disk(r.x,.552,r.z,5.5,4.5,season===3?'#c6d5cb':'#9fae8c',40);
+  }
+  // Landmarks are drawn at their saved positions, so old islands remain intact.
+  for(const node of sim.s.world.nodes){
+   if(!sim.knownAt(node.x,node.z))continue;
+   const {x,z}=node;
+   if(['stone','copper','lookout'].includes(node.id)){
+    for(let i=0;i<5;i++)g.ball(x+(i%3)*.6-.6,.65,z+Math.floor(i/3)*.5, .65,node.id==='lookout'?1.2+i*.13:.55,.6,node.id==='copper'?'#b89573':'#a4b0a6',6,3);
+   }
+   if(node.id==='spring'){g.disk(x,.563,z,1.1,.85,'#6da9a6',24,1);g.disk(x,.57,z,.65,.55,'#99c9b9',24,1);for(let i=0;i<9;i++){let a=i/9*Math.PI*2;g.ball(x+Math.cos(a)*1.1,.59,z+Math.sin(a)*.85,.25,.22,.2,COL.stone,5,3);}}
+   if(node.kind==='cache'&&node.left>0){
+    if(node.resource==='stone'){for(let i=0;i<5;i++)g.ball(x+(i%3)*.4,.64,z+Math.floor(i/3)*.35,.3,.3,.35,COL.stone,5,3);}
+    else for(let i=0;i<6;i++){let a=i*2.4;g.cone(x+Math.cos(a)*.65,.56,z+Math.sin(a)*.65,.14,node.resource==='fiber'?.9:.42,node.resource==='seeds'?'#d4bf7b':'#8fa671',5);if(node.resource==='fresh'||node.resource==='herbs')g.ball(x+Math.cos(a)*.65,1,z+Math.sin(a)*.65,.13,.1,.12,node.resource==='herbs'?'#c4a0ac':'#b97974',5,3);}
+   }
+  }
   let rng=rand(562);for(let i=0;i<140;i++){let x=(rng()-.5)*29,z=(rng()-.5)*23,r=landRatio(x,z);if(r<.86&&r>.35){let c=season===2?'#bfbb82':season===3?'#dce0c5':'#c6cb8c';g.cone(x,.56,z,.08,.14,c,4);if(i%4===0)g.ball(x,.7,z,.07,.07,.07,i%2?'#efe5ba':'#d7bb98',4,2);}}
   // Three distant islets make the horizon feel larger without unlocking Island Two.
-  for(let [x,z,r]of [[-30,-24,3],[30,-29,4],[38,3,1.8]]){g.cone(x,-.26,z,r,.65,'#c6d6b5',10,r*.65);g.ball(x,.65,z,r*.55,.7,r*.47,'#7f9c7d',8,3);}
+  for(let [x,z,r]of [[-43,-32,3],[39,-42,4],[43,3,1.8]]){g.cone(x,-.26,z,r,.65,'#c6d6b5',10,r*.65);g.ball(x,.65,z,r*.55,.7,r*.47,'#7f9c7d',8,3);}
  }
  boat(g,x,y,z,r=0,scale=1,sail=true){const start=g.v.length;g.at(x,y,z,r,()=>{
   g.quad([-.62,0,1.25],[.62,0,1.25],[.65,.45,-.8],[-.65,.45,-.8],COL.wood);g.tri([-.65,.45,-.8],[.65,.45,-.8],[0,.55,-1.65],COL.woodDark);g.quad([-.62,0,1.25],[-.65,.45,-.8],[0,-.12,-1.15],[0,-.12,1],COL.woodDark);g.quad([0,-.12,1],[0,-.12,-1.15],[.65,.45,-.8],[.62,0,1.25],COL.wood);g.box(0,.34,.28,1.15,.09,1.7,'#be9b6b');g.box(0,.35,0,.09,2.15,.09,COL.woodDark);
@@ -79,12 +92,16 @@ class IslandView {
   else if(b.type==='bench'){g.box(0,.3,0,1.1,.1,.38,COL.wood);g.box(-.4,0,0,.12,.3,.28,COL.woodDark);g.box(.4,0,0,.12,.3,.28,COL.woodDark);g.box(0,.45,-.17,1.1,.23,.08,COL.wood);}
   else if(b.type==='lamp'){post(0,0,1.6);g.box(.1,1.55,0,.35,.07,.12,COL.woodDark);g.box(.22,1.19,0,.23,.32,.23,'#f4cb78',3);g.roof(.22,1.5,0,.32,.15,.32,COL.woodDark);}
  });}
- rebuild(sim){const g=new Geo();this.terrain(g,sim.season);
+ rebuild(sim){const g=new Geo();this.terrain(g,sim.season,sim);
   for(let path of sim.s.paths)for(let i=1;i<path.length;i++){let a=path[i-1],b=path[i],dx=b.x-a.x,dz=b.z-a.z,n=Math.hypot(dx,dz)||1,w=.25;g.quad([a.x-dz/n*w,.562,a.z+dx/n*w],[b.x-dz/n*w,.562,b.z+dx/n*w],[b.x+dz/n*w,.562,b.z-dx/n*w],[a.x+dz/n*w,.562,a.z-dx/n*w],'#c7b78b');}
-  for(let t of sim.s.world.trees)this.tree(g,t,sim.season,t.wood<=0&&t.regrow>0);
+  for(let t of sim.s.world.trees)if(sim.knownAt(t.x,t.z))this.tree(g,t,sim.season,t.wood<=0&&t.regrow>0);
   let wr=sim.s.world.nodes.find(n=>n.id==='wreck');if(wr.left>0){g.at(wr.x,.13,wr.z,.4,()=>{g.box(0,.12,0,2.8,.25,.9,COL.woodDark);for(let i=0;i<5;i++)g.box(-1+i*.45,.35,0,.32,.12,1.05,COL.wood);g.box(-.6,.4,0,.09,1.6,.09,COL.woodDark);g.tri([-.6,1.9,0],[-.6,.7,0],[.65,.6,.3],'#cfbb93');g.box(1.5,.13,.1,.5,.42,.5,'#b99a70');});}
   g.at(5,.08,10,.8,()=>{g.box(0,0,0,2,.2,.2,COL.wood);g.box(0,.08,.4,1.4,.15,.18,COL.wood);});
   for(let b of sim.buildings)this.building(g,b,sim.season);
+  // Soft, layered mist marks unexplored terrain without revealing resource locations.
+  for(const r of REGIONS.slice(1))if(!sim.explored(r.id)){
+   const rng=rand(hash(r.id));for(let i=0;i<10;i++){let x=r.x+(rng()-.5)*10,z=r.z+(rng()-.5)*8;if(landRatio(x,z)>.9||regionAt(x,z)==='home')continue;for(let j=0;j<4;j++)g.disk(x,.72+i*.004+j*.001,z,4.8-j*.62,3.6-j*.45,[.82,.88,.82,.11],24,3);}
+  }
   this.staticCount=g.v.length/11;this.staticVerts=new Float32Array(g.v);const gl=this.gl;if(gl){gl.bindBuffer(gl.ARRAY_BUFFER,this.staticBuffer);gl.bufferData(gl.ARRAY_BUFFER,this.staticVerts,gl.STATIC_DRAW);}this.lastSeason=sim.season;sim.dirty=false;
  }
  person(g,p,sim,t){let old=this.visualPeople.get(p.id)||{x:p.x,z:p.z};old.x+=(p.x-old.x)*.2;old.z+=(p.z-old.z)*.2;this.visualPeople.set(p.id,old);let walking=Math.hypot(p.x-old.x,p.z-old.z)>.03,life=sim.life(p),scale=life==='Baby'?.40:life==='Child'?.65:life==='Teen'?.84:1,y=groundY(old.x,old.z);
@@ -108,7 +125,7 @@ class IslandView {
   for(let q of triangles){ctx.fillStyle=q.c;ctx.beginPath();ctx.moveTo(...q.p[0]);ctx.lineTo(...q.p[1]);ctx.lineTo(...q.p[2]);ctx.closePath();ctx.fill();if(q.a>.99){ctx.lineWidth=.5;ctx.strokeStyle=q.c;ctx.stroke();}}
  }
  drawBuffer(buffer,count){let gl=this.gl;gl.bindBuffer(gl.ARRAY_BUFFER,buffer);let stride=44,offset=0;[3,3,4,1].forEach((n,i)=>{gl.enableVertexAttribArray(this.attr[i]);gl.vertexAttribPointer(this.attr[i],n,gl.FLOAT,false,stride,offset);offset+=n*4;});gl.drawArrays(gl.TRIANGLES,0,count);}
- render(sim,t,selection=null,ghost=null){if(this.software&&t-(this.lastSoft||0)<.12)return;this.lastSoft=t;this.camera();if(sim.dirty||this.lastSeason!==sim.season)this.rebuild(sim);let day=.94+.06*Math.sin((sim.s.time-.25)*Math.PI*2);if(sim.night)day=.58;day=clamp(day,.50,1);if(!sim.s.started)day=.95;
+ render(sim,t,selection=null,ghost=null){if(this.software&&t-(this.lastSoft||0)<.12)return;this.lastSoft=t;this.camera();if(sim.dirty||this.lastSeason!==sim.season)this.rebuild(sim);let light=clamp((Math.sin((sim.s.time-.25)*Math.PI*2)+.20)/.70,0,1);light=light*light*(3-2*light);let day=.50+.50*light;if(!sim.s.started)day=.95;
   let gl=this.gl;if(gl){gl.useProgram(this.program);gl.clearColor(.41*day+.14*(1-day),.68*day+.22*(1-day),.68*day+.28*(1-day),1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.uniformMatrix4fv(this.uni.uM,false,this.matrix);gl.uniform1f(this.uni.uT,t);gl.uniform1f(this.uni.uDay,day);let hp=sim.hearthPos();gl.uniform3f(this.uni.uH,hp.x,.5,hp.z);this.drawBuffer(this.staticBuffer,this.staticCount);}
   let g=new Geo();for(let p of sim.people)if(!sim.s.boat.crew.includes(p.id)||!['sailing','arrived'].includes(sim.s.boat.stage))this.person(g,p,sim,t);
   for(let b of sim.buildings.filter(b=>b.built)){
