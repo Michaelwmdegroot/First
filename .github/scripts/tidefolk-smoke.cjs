@@ -58,18 +58,15 @@ async function test(engine,name,options,touch){
   const paths=await page.evaluate(()=>tidefolk.sim.s.paths.length);
   await click('[data-act="build"]');await click('[data-act="path"]');
   const points=await page.evaluate(()=>[tidefolk.view.project(-3,.55,0),tidefolk.view.project(-1,.55,0)]);
-  await page.evaluate(points=>{const c=document.querySelector('#world');for(const [i,p] of points.entries()){c.dispatchEvent(new PointerEvent(i?'pointermove':'pointerdown',{pointerId:99,pointerType:'touch',clientX:p.x,clientY:p.y,bubbles:true}));}const p=points[points.length-1];c.dispatchEvent(new PointerEvent('pointerup',{pointerId:99,pointerType:'touch',clientX:p.x,clientY:p.y,bubbles:true}));},points).catch(()=>{});
-  // Synthetic pointer capture is not supported on every engine; mouse path is the fallback exercise.
-  if(await page.evaluate(()=>tidefolk.sim.s.paths.length)===paths){await page.mouse.move(points[0].x,points[0].y);await page.mouse.down();await page.mouse.move(points[1].x,points[1].y,{steps:8});await page.mouse.up();}
+  await page.mouse.move(points[0].x,points[0].y);await page.mouse.down();await page.mouse.move(points[1].x,points[1].y,{steps:8});await page.mouse.up();
   await click('[data-act="endpath"]');
-  r.pathCount=await page.evaluate(()=>tidefolk.sim.s.paths.length);
+  r.pathCount=await page.evaluate(()=>tidefolk.sim.s.paths.length);assert.ok(r.pathCount>paths);
+  r.checks.push('Native pointer drag creates a terrain path');
   r.layout=await page.evaluate(()=>({width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth}));assert.ok(r.layout.scrollWidth<=r.layout.width+1);
-  // Save export is a real browser download and validates as versioned JSON.
   await click('[data-act="settings"]');
   const downloadPromise=page.waitForEvent('download');await click('[data-act="export"]');const download=await downloadPromise;
   const exported=path.join(out,name+'-save.json');await download.saveAs(exported);assert.equal(JSON.parse(fs.readFileSync(exported,'utf8')).version,1);
   r.checks.push('Versioned save export downloads successfully');
-  // Invalid files must be rejected without replacing the current island.
   await page.locator('#importfile').setInputFiles({name:'invalid.json',mimeType:'application/json',buffer:Buffer.from('{"version":999}')});
   await page.waitForTimeout(100);assert.deepEqual(await page.evaluate(()=>tidefolk.sim.people.map(p=>p.id)),ids);
   r.checks.push('Invalid save import leaves the current story intact');
