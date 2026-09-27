@@ -90,18 +90,51 @@ function goalAction(id){let g=GOALS.find(g=>g.id===id);if(!g)return;let a=g.acti
  else if(a==='fish'){if(!sim.s.flags.fishing)openPanel('node','fishing');else if(!sim.learned('fishing'))openPanel('knowledge');else preview('fish');}
  else if(a.startsWith('node:')){let nid=a.split(':')[1];UI.selected={kind:'node',id:nid};openPanel('node',nid);}else if(a.startsWith('build:'))preview(a.split(':')[1]);else openPanel(a);
 }
+// Preserve live touch targets across HUD updates, including moving map markers.
+function patchTree(target, source){
+ const incoming=Array.from(source.childNodes);
+ incoming.forEach((next,i)=>{
+  const old=target.childNodes[i];
+  if(!old){target.appendChild(next.cloneNode(true));return;}
+  if(old.nodeType!==next.nodeType||old.nodeName!==next.nodeName){old.replaceWith(next.cloneNode(true));return;}
+  if(next.nodeType===3){if(old.nodeValue!==next.nodeValue)old.nodeValue=next.nodeValue;return;}
+  if(next.nodeType===1){patchAttributes(old,next);patchTree(old,next);}
+ });
+ while(target.childNodes.length>incoming.length)target.lastChild.remove();
+}
+function patchAttributes(target,source){
+ for(const a of Array.from(target.attributes))if(!source.hasAttribute(a.name))target.removeAttribute(a.name);
+ for(const a of source.attributes)if(target.getAttribute(a.name)!==a.value)target.setAttribute(a.name,a.value);
+}
+function stableHTML(target,html){
+ if(target._tideHTML===html)return;
+ const template=document.createElement('template');template.innerHTML=html;
+ patchTree(target,template.content);target._tideHTML=html;
+}
+function stableMarkers(html){
+ const target=$('#markers');if(target._tideHTML===html)return;
+ const template=document.createElement('template');template.innerHTML=html;
+ const existing=new Map(Array.from(target.children).map(el=>[el.dataset.act,el]));
+ for(const next of template.content.children){
+  const old=existing.get(next.dataset.act);
+  if(old){patchAttributes(old,next);patchTree(old,next);existing.delete(next.dataset.act);}
+  else target.appendChild(next.cloneNode(true));
+ }
+ for(const old of existing.values())old.remove();
+ target._tideHTML=html;
+}
 function paintHUD(){let s=sim.s;$('#date').textContent=BALANCE.seasonNames[sim.season]+' · Day '+sim.seasonDay;$('#year').textContent='Year '+sim.year+' · '+(s.paused?'A moment to plan':s.time>.76?'The evening Hearth':s.time<.26?'A quiet morning':'A day on the island');$('#clock').textContent=s.time<.26?'Dawn':s.time<.5?'Morning':s.time<.76?'Afternoon':'Evening';$('#stage').textContent=sim.stage+' · '+sim.people.length+' people';
  let rs=[['food','Food',sim.food],['wood','Wood',s.stock.wood],[sim.learned('stonework')?'stone':'fiber',sim.learned('stonework')?'Stone':'Thatch',sim.learned('stonework')?s.stock.stone:s.stock.fiber],['insight','Insight',s.insight]];
- $('#resources').innerHTML=rs.map(([k,n,v])=>`<button class="resource" data-act="${k==='insight'?'knowledge':'supplies'}">${ico(k==='insight'?'spark':GOODS[k][1])}<span><strong>${Math.floor(v)}</strong><small>${n}</small></span></button>`).join('');
- document.querySelectorAll('[data-act^="speed:"]').forEach(b=>b.classList.toggle('active',Number(b.dataset.act.split(':')[1])===s.speed&&!s.paused));$('#pausebtn').innerHTML=ico(s.paused?'play':'pause');$('#soundbtn').classList.toggle('active',!!UI.sound);
+ stableHTML($('#resources'),rs.map(([k,n,v])=>`<button class="resource" data-act="${k==='insight'?'knowledge':'supplies'}">${ico(k==='insight'?'spark':GOODS[k][1])}<span><strong>${Math.floor(v)}</strong><small>${n}</small></span></button>`).join(''));
+ document.querySelectorAll('[data-act^="speed:"]').forEach(b=>b.classList.toggle('active',Number(b.dataset.act.split(':')[1])===s.speed&&!s.paused));stableHTML($('#pausebtn'),ico(s.paused?'play':'pause'));$('#soundbtn').classList.toggle('active',!!UI.sound);
  if(s.started){for(let g of GOALS)if(g.test(sim)&&!s.awards[g.id])sim.award(g.id,g.title,g.reward);}
- let g=GOALS.find(g=>!sim.s.awards[g.id])||GOALS[GOALS.length-1],done=GOALS.filter(g=>s.awards[g.id]).length;$('#objective').innerHTML=`<div class="eyebrow">${ico('leaf')} ${sim.stage} · ${done} / ${GOALS.length}</div><h2>${g.title}</h2><p>${g.desc}</p><button class="linkbtn" data-act="goal:${g.id}">${g.label} ${ico('arrow')}</button><div class="progressline"><i style="width:${done/GOALS.length*100}%"></i></div>`;
+ let g=GOALS.find(g=>!sim.s.awards[g.id])||GOALS[GOALS.length-1],done=GOALS.filter(g=>s.awards[g.id]).length;stableHTML($('#objective'),`<div class="eyebrow">${ico('leaf')} ${sim.stage} · ${done} / ${GOALS.length}</div><h2>${g.title}</h2><p>${g.desc}</p><button class="linkbtn" data-act="goal:${g.id}">${g.label} ${ico('arrow')}</button><div class="progressline"><i style="width:${done/GOALS.length*100}%"></i></div>`);
  $('#objective').style.display=UI.panel||UI.ghost||UI.pathMode?'none':'';$('#demoBadge').hidden=!s.demo;
 }
 function paintMarkers(){let nodes=sim.s.world.nodes.filter(n=>!n.found&&(n.id==='wreck'?n.left>0:['spring','seeds','fishing'].includes(n.id)||sim.day>5));let str='';for(let n of nodes){let p=view.project(n.x,groundY(n.x,n.z)+1.4,n.z);if(p.x<15||p.x>view.w-15||p.y<150||p.y>view.h-190)continue;str+=`<button class="marker" style="left:${p.x}px;top:${p.y}px" data-act="node:${n.id}" aria-label="${esc(n.name)}">${ico(n.icon)}</button>`;}
  if(sim.s.pendingArrival){let a=sim.s.pendingArrival,p=view.project(a.x,2,a.z);str+=`<button class="marker arrival" style="left:${p.x}px;top:${p.y}px" data-act="people" aria-label="A survivor is waiting">${ico('people')}</button>`;}
  if(view.zoom>1.3||UI.selected?.kind==='person')for(let c of sim.people){if(UI.selected?.kind==='person'&&UI.selected.id!==c.id&&view.zoom<1.4)continue;let p=view.project(c.x,1.95,c.z);if(p.y<150||p.y>view.h-165)continue;str+=`<button class="marker person" style="left:${p.x}px;top:${p.y}px" data-act="person:${c.id}">${esc(c.first)}</button>`;}
- $('#markers').innerHTML=str;$('#markers').style.display=UI.ghost||UI.pathMode||!sim.s.started?'none':'';
+ stableMarkers(str);$('#markers').style.display=UI.ghost||UI.pathMode||!sim.s.started?'none':'';
 }
 class IslandAudio{constructor(){let A=window.AudioContext||window.webkitAudioContext;this.ctx=new A();let b=this.ctx.createBuffer(1,this.ctx.sampleRate*4,this.ctx.sampleRate),d=b.getChannelData(0),r=rand(7),last=0;for(let i=0;i<d.length;i++){last=(last+.02*(r()*2-1))/1.02;d[i]=last;}let source=this.ctx.createBufferSource();source.buffer=b;source.loop=true;let filter=this.ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=550;this.gain=this.ctx.createGain();this.gain.gain.value=.32;source.connect(filter).connect(this.gain).connect(this.ctx.destination);source.start();}
  note(){if(this.ctx.state!=='running')this.ctx.resume();let o=this.ctx.createOscillator(),g=this.ctx.createGain(),t=this.ctx.currentTime;o.type='sine';o.frequency.value=[261.63,293.66,329.63,392,440][Math.floor(Math.random()*5)];g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.04,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+1.5);o.connect(g).connect(this.ctx.destination);o.start();o.stop(t+1.6);}
@@ -155,7 +188,7 @@ function pointerControls(){let canvas=$('#world'),points=new Map(),gesture=null,
  const end=e=>{points.delete(e.pointerId);if(points.size)return;if(!gesture)return;if(UI.pathMode){if(stroke.length>1){sim.s.paths.push(stroke.slice(0,150));sim.s.paths=sim.s.paths.slice(-120);sim.dirty=true;save();}stroke=[];view.previewPath=null;}else if(!gesture.moved){let p=view.ground(e.clientX,e.clientY);if(UI.ghost){UI.ghost.x=p.x;UI.ghost.z=p.z;paintPlacement();}else{let candidates=[];for(let c of sim.people){let pt=view.project(c.x,.55+.7,c.z);candidates.push({kind:'person',id:c.id,d:Math.hypot(pt.x-e.clientX,pt.y-e.clientY),limit:20});}for(let b of sim.buildings){let pt=view.project(b.x,.55+.6,b.z);candidates.push({kind:'building',id:b.id,d:Math.hypot(pt.x-e.clientX,pt.y-e.clientY),limit:Math.max(25,BUILD[b.type].size*view.px)});}candidates=candidates.filter(c=>c.d<c.limit).sort((a,b)=>a.d-b.d);if(candidates[0])act(candidates[0].kind+':'+candidates[0].id);else{UI.selected=null;closePanel();}}}gesture=null;};
  canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',()=>{points.clear();gesture=null;stroke=[];view.previewPath=null;});canvas.addEventListener('wheel',e=>{e.preventDefault();view.zoom=clamp(view.zoom*Math.exp(-e.deltaY*.001),.65,3.5);},{passive:false});
 }
-document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(UI.sound)UI.sound.ctx.suspend();}});window.addEventListener('pagehide',save);document.addEventListener('keydown',e=>{if(e.target.matches('input,select'))return;if(e.key==='Escape'){UI.ghost=null;UI.pathMode=false;$('#placement').hidden=true;closePanel();}if(e.key===' '){e.preventDefault();act('pause');}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(UI.sound)UI.sound.ctx.suspend().catch(()=>{});}else if(UI.sound)UI.sound.ctx.resume().catch(()=>{});});window.addEventListener('pagehide',save);document.addEventListener('keydown',e=>{if(e.target.matches('input,select'))return;if(e.key==='Escape'){UI.ghost=null;UI.pathMode=false;$('#placement').hidden=true;closePanel();}if(e.key===' '){e.preventDefault();act('pause');}});
 try{
  setupSim(new TideSim());view=new IslandView($('#world'));icons();pointerControls();welcome();let last=performance.now();
  function frame(t){let dt=Math.min((t-last)/1000,.1);last=t;if(!document.hidden){sim.advance(dt);view.render(sim,t/1000,UI.selected,UI.ghost);if(t-UI.lastPaint>350){paintHUD();paintMarkers();UI.lastPaint=t;}if(t>UI.toastUntil)$('#toast').classList.remove('show');if(t-UI.saveAt>10000){save();UI.saveAt=t;}
@@ -163,5 +196,5 @@ try{
   if(sim.s.boat.stage==='arrived'&&!UI.endShown){UI.endShown=true;save();ending();}
  }
  requestAnimationFrame(frame);}
- requestAnimationFrame(frame);window.tidefolk={get sim(){return sim;},view,UI,act,save,version:'0.1.0'};
+ requestAnimationFrame(frame);window.tidefolk={get sim(){return sim;},view,UI,act,save,version:'0.1.1'};
 }catch(e){$('#fatal').hidden=false;$('#fatal').textContent='Tidefolk could not open the island: '+e.message;console.error(e);}
