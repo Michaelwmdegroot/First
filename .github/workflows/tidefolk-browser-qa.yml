@@ -4,7 +4,8 @@ on:
     branches: [main]
     paths:
       - 'tidefolk-v01/**'
-      - '.github/scripts/tidefolk-*'
+      - '.github/qa/tidefolk-*'
+      - '.github/staging/tidefolk-*'
       - '.github/workflows/tidefolk-browser-qa.yml'
   workflow_dispatch:
 permissions:
@@ -16,46 +17,70 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    env:
+      GAME_DIR: ${{ github.workspace }}/tidefolk-v01
+      REPORT_DIR: ${{ github.workspace }}/tidefolk-qa-results
+      LEGACY_FIXTURE: /tmp/tidefolk-qa/legacy-v1.b64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply guarded 0.1.1 recovery, only when not already applied
+      - name: Prepare the exact reviewed release when staged
         run: |
-          python .github/scripts/tidefolk-recover.py tidefolk-v01
+          if [ -f .github/staging/tidefolk-v020.py ]; then
+            python .github/staging/tidefolk-v020.py tidefolk-v01
+          fi
           for file in tidefolk-v01/*.js; do node --check "$file"; done
-      - name: Install browser test tools outside the game
+      - name: Build a real legacy save using pinned 0.1.1 simulation
         run: |
-          mkdir -p /tmp/tidefolk-qa
+          mkdir -p /tmp/tidefolk-qa "$REPORT_DIR"
+          python - <<'PY'
+          import hashlib, pathlib, urllib.request
+          root=pathlib.Path('/tmp/tidefolk-qa')
+          expected={'data.js':'3286367c020cca8d05898a20d4583bbc2dfbabf8f3aa0c5ee5eab404cf8fecd6','sim.js':'8c054753e3b4b2b739c47e81a8c5a64e1ac8ebfbd769df154c116d7d074b41c1'}
+          for name,digest in expected.items():
+              raw=urllib.request.urlopen('https://raw.githubusercontent.com/Michaelwmdegroot/First/e193e1ef68a1021c6b7dfffb5d75aa3d6f9b7941/tidefolk-v01/'+name,timeout=30).read()
+              assert hashlib.sha256(raw).hexdigest()==digest
+              (root/('legacy-'+name)).write_bytes(raw)
+          PY
+          node - <<'JS'
+          const fs=require('fs'),vm=require('vm'),zlib=require('zlib');
+          const dir='/tmp/tidefolk-qa/',ctx={console};vm.createContext(ctx);
+          vm.runInContext(fs.readFileSync(dir+'legacy-data.js','utf8')+'\n'+fs.readFileSync(dir+'legacy-sim.js','utf8')+'\nthis.TideSim=TideSim;',ctx);
+          const s=new ctx.TideSim();s.s.started=true;s.orderNode('wreck');s.runDays(1);s.orderBuild('hearth',0,1);s.runDays(2);
+          if(!s.has('hearth'))throw Error('Legacy fixture construction failed');
+          fs.writeFileSync(process.env.LEGACY_FIXTURE,zlib.gzipSync(JSON.stringify(s.toJSON())).toString('base64'));
+          JS
+      - name: Test simulation, exploration and legacy migration
+        run: node .github/qa/tidefolk-sim.cjs | tee "$REPORT_DIR/simulation.txt"
+      - name: Install pinned browser test tools outside the game
+        run: |
           cd /tmp/tidefolk-qa
           npm init -y
           npm install --save-exact playwright@1.55.0
           npx playwright install --with-deps chromium webkit
       - name: Verify desktop, Android and iPhone browser behavior
-        env:
-          GAME_DIR: ${{ github.workspace }}/tidefolk-v01
-          REPORT_DIR: ${{ github.workspace }}/tidefolk-qa-results
         run: |
-          cp .github/scripts/tidefolk-smoke.cjs /tmp/tidefolk-qa/smoke.cjs
-          node /tmp/tidefolk-qa/smoke.cjs
-      - name: Publish only tested recovery files
+          cp .github/qa/tidefolk-browser.cjs /tmp/tidefolk-qa/browser.cjs
+          node /tmp/tidefolk-qa/browser.cjs
+      - name: Publish only passing source and remove one-use staging
         run: |
-          git add -- tidefolk-v01/ui.js tidefolk-v01/world.js tidefolk-v01/style.css
-          if ! git diff --cached --quiet; then
+          if [ -f .github/staging/tidefolk-v020.py ]; then
+            git add -- tidefolk-v01/
+            git rm -- .github/staging/tidefolk-v020.py
+            git rm --ignore-unmatch -- .github/scripts/tidefolk-recover.py .github/scripts/tidefolk-smoke.cjs
             git config user.name 'Tidefolk release automation'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix(tidefolk): publish browser-tested 0.1.1 recovery'
+            git commit -m 'feat(tidefolk): slower days and a four-times-larger explorable island'
             git push origin HEAD:main
           fi
           echo "RELEASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
-      - name: Verify all six pinned raw.githack files
+      - name: Verify pinned raw.githack release bytes
         env:
-          GAME_DIR: ${{ github.workspace }}/tidefolk-v01
-          REPORT_DIR: ${{ github.workspace }}/tidefolk-qa-results
           HOST_ONLY: '1'
-        run: node /tmp/tidefolk-qa/smoke.cjs
-      - name: Retain source, screenshots and report
+        run: node /tmp/tidefolk-qa/browser.cjs
+      - name: Retain source, screenshots and evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
