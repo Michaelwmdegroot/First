@@ -1,0 +1,23 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),zlib=require('zlib');
+const root=process.env.GAME_DIR,ctx={console};vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(root+'/data.js','utf8')+'\n'+fs.readFileSync(root+'/sim.js','utf8')+'\nthis.TideSim=TideSim;this.REGIONS=REGIONS;this.ratio=landRatio;this.legacyRatio=starterLandRatio;this.regionAt=regionAt;',ctx);
+let s=new ctx.TideSim(),checks=[];assert.equal(s.s.version,2);assert.equal(s.daySeconds,360);
+let area=0,old=0;for(let x=-36;x<=36;x+=.25)for(let z=-48;z<=16;z+=.25){area+=ctx.ratio(x,z)<1;old+=ctx.legacyRatio(x,z)<1;}assert.ok(area/old>3.8);checks.push('Island has over 3.8 times the previous land area');
+for(let r of ctx.REGIONS)assert.equal(ctx.regionAt(r.x,r.z),r.id);
+for(let n of s.s.world.nodes)assert.ok(ctx.ratio(n.x,n.z)<1,n.name+' must be reachable on land');
+assert.equal(s.orderScout('pinewood'),'Build the Founding Hearth before heading inland.');assert.match(s.orderNode('ridge_stone'),/Explore Greyback Ridge/);assert.match(s.orderBuild('hearth',0,-16).error,/Explore/);checks.push('Undiscovered regions cannot be built on or harvested');
+s.s.started=true;s.s.paused=false;let start=s.s.time;for(let i=0;i<600;i++)s.advance(.1);assert.ok(Math.abs(s.s.time-start-1/6)<.003);checks.push('60 real seconds advances exactly one sixth of a default day');
+s.s.paused=true;assert.equal(s.orderNode('wreck'),'');s.runDays(1);let h=s.orderBuild('hearth',0,1);assert.ok(!h.error,h.error);s.runDays(1);assert.ok(s.has('hearth'));
+for(let i=0;i<4&&s.s.stock.fiber<8;i++){s.orderNode('wreck');s.runDays(1);}assert.ok(!s.orderBuild('shelter',-4,5).error);s.runDays(4);assert.ok(s.has('shelter'));
+assert.equal(s.orderNode('spring'),'');s.runDays(2);s.meetTonight();assert.ok(s.s.flags.spring);assert.equal(s.research('woodcraft'),'');assert.equal(s.research('hunting'),'');checks.push('Original opening, shelter, spring, council and research still work');
+let stock=JSON.stringify(s.s.stock);assert.equal(s.orderScout('pinewood'),'');assert.equal(JSON.stringify(s.s.stock),stock);assert.ok(s.scoutFor('pinewood'));s.runDays(3);assert.ok(s.explored('pinewood'));assert.equal(s.s.world.explorationLog.length,1);
+let loaded=new ctx.TideSim(ctx.TideSim.validate(JSON.parse(JSON.stringify(s.toJSON()))));assert.ok(loaded.explored('pinewood'));assert.equal(loaded.s.world.trees.length,s.s.world.trees.length);
+assert.equal(s.orderScout('headland'),'First explore Greyback Ridge.');
+for(let id of ['meadow','ridge','cove','headland']){assert.equal(s.orderScout(id),'');s.runDays(4);assert.ok(s.explored(id),id+' failed');}
+assert.ok(s.s.world.explorationLog.every(q=>s.people.some(p=>p.id===q.person)));checks.push('All five new regions explored by named people through ordinary simulation');
+assert.equal(s.orderNode('ridge_stone'),'');s.runDays(3);assert.ok(s.s.stock.stone>=5);assert.equal(s.s.world.nodes.find(n=>n.id==='ridge_stone').left,19);assert.equal(s.orderNode('stone'),'');s.runDays(3);s.meetTonight();assert.ok(s.s.flags.stone);checks.push('New resource gathering delivers stock and mineral discovery reaches the council');
+let v1=JSON.parse(zlib.gunzipSync(Buffer.from(fs.readFileSync(process.env.LEGACY_FIXTURE,'utf8').trim(),'base64'))),ids=v1.people.map(p=>p.id),nodes=v1.world.nodes.map(n=>[n.id,n.x,n.z]),buildings=v1.buildings.map(b=>[b.id,b.x,b.z]),oldStock=JSON.stringify(v1.stock);
+let migrated=new ctx.TideSim(ctx.TideSim.validate(v1));assert.equal(migrated.s.version,2);assert.equal(migrated.daySeconds,360);assert.equal(JSON.stringify(migrated.people.map(p=>p.id)),JSON.stringify(ids));assert.equal(JSON.stringify(migrated.buildings.map(b=>[b.id,b.x,b.z])),JSON.stringify(buildings));assert.equal(JSON.stringify(migrated.s.stock),oldStock);for(let[id,x,z]of nodes){let n=migrated.s.world.nodes.find(n=>n.id===id);assert.equal(n.x,x);assert.equal(n.z,z);}
+migrated=new ctx.TideSim(ctx.TideSim.validate(JSON.parse(JSON.stringify(migrated.toJSON()))));assert.equal(JSON.stringify(migrated.s.stock),oldStock);assert.equal(migrated.s.world.nodes.filter(n=>n.id==='ridge_stone').length,1);checks.push('Legacy people, buildings, stock and discoveries preserved; reloading does not duplicate resources');
+console.log(JSON.stringify({passed:true,checks,areaRatio:area/old,explored:s.s.world.explored,finalDay:s.day,treeCount:s.s.world.trees.length,landmarks:s.s.world.nodes.length},null,2));
