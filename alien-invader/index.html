@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#eaf2e8">
+<meta name="description" content="A cozy-looking, quietly devious strategy game. Build a hidden alien network, infiltrate Earth and manage a century of very human complications.">
+<title>Alien Invader Simulator — A very quiet invasion</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='19' fill='%238dbea8'/%3E%3Cpath d='M13 22C10 2 54 2 51 22c-2 19-13 29-19 29S15 41 13 22Z' fill='%23c1e3bd'/%3E%3Cellipse cx='23' cy='26' rx='5' ry='9' fill='%23203f3c' transform='rotate(-25 23 26)'/%3E%3Cellipse cx='41' cy='26' rx='5' ry='9' fill='%23203f3c' transform='rotate(25 41 26)'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body class="title-mode is-loading">
+<div class="cosmic-backdrop" aria-hidden="true"></div>
+<div id="globe"></div>
+<header class="topbar">
+ <button class="brand" data-action="home" aria-label="Alien Invader Simulator main menu"><span id="brand-alien"></span><span class="brand-name">ALIEN INVADER<small>SIMULATOR</small></span></button>
+ <div id="top-resources" class="top-resources game-only" aria-label="Network resources"></div>
+ <div class="top-actions"><button class="icon-btn" data-action="sound" title="Toggle sound" aria-label="Toggle sound" id="sound-button"></button><button class="icon-btn" data-action="help" title="Field guide" aria-label="Field guide" id="help-button"></button><button class="icon-btn" data-action="settings" title="Settings & save" aria-label="Settings and save" id="settings-button"></button></div>
+</header>
+<section id="welcome" class="welcome title-only" aria-label="Main menu">
+ <span class="eyebrow"><span class="status-dot"></span> A VERY QUIET INVASION</span>
+ <h1>Big plans.<br>Small planet.</h1>
+ <p>One hundred years to take over Earth.<br>Preferably without anyone noticing.</p>
+ <div class="welcome-tags"><span>Build a secret network</span><span>Befriend. Infiltrate. Adapt.</span></div>
+ <div class="welcome-buttons"><button id="new-game-button" class="button primary jumbo" data-action="new-game" disabled>Connecting to Earth…</button><button id="continue-button" class="button secondary" data-action="continue" hidden>Continue your invasion</button></div>
+ <div class="welcome-foot"><span class="keycap">SPACE</span> to pause. Plenty of time to be devious.</div>
+ <button class="text-button quiet" data-action="about">Original alternate-history fiction · Browser edition 1.0</button>
+</section>
+<div class="title-orbit-note title-only"><span class="status-dot"></span> SOL SYSTEM / PLANET 03<small>Local species: highly interesting.</small></div>
+<div id="game-hud" class="game-only">
+ <nav id="nav-rail" class="nav-rail" aria-label="Management screens"></nav>
+ <section class="world-caption"><span class="eyebrow" id="world-eyebrow">SOL SYSTEM / PLANET 03</span><h1 id="era-title">Atomic Dawn</h1><p id="era-description">A small beginning. A very big secret.</p></section>
+ <section id="directive" class="directive panel" aria-label="Current directive"></section>
+ <div class="map-tools"><button class="map-layer-button" data-action="layers" id="layer-button"></button><div class="zoom-controls"><button data-action="zoom-in" aria-label="Zoom in" id="zoom-in"></button><button data-action="zoom-out" aria-label="Zoom out" id="zoom-out"></button><button data-action="focus" aria-label="Center selected country" id="focus-button"></button></div><span class="map-hint">Drag to turn · Scroll to explore</span></div>
+ <aside id="country-panel" class="country-panel panel" aria-label="Selected country"></aside>
+ <div class="world-status" id="world-status"></div>
+ <footer class="bottom-dock"><section id="time-panel" class="time-panel panel" aria-label="Simulation time"></section><section id="operation-strip" class="operation-strip" aria-label="Current operations"></section><button class="save-pip" data-action="quick-save" title="Save campaign" aria-label="Save campaign" id="quick-save-button"></button></footer>
+</div>
+<div id="drawer-scrim" class="drawer-scrim" hidden></div>
+<section id="drawer" class="drawer panel" aria-label="Management panel" hidden><header class="drawer-header"><div><span class="eyebrow" id="drawer-eyebrow">NETWORK MANAGEMENT</span><h2 id="drawer-title"></h2><p id="drawer-description"></p></div><button class="icon-btn" data-action="close-drawer" aria-label="Close management panel" id="drawer-close"></button></header><div id="drawer-tabs" class="drawer-tabs"></div><div id="drawer-body" class="drawer-body"></div></section>
+<div id="modal-scrim" class="modal-scrim" hidden></div>
+<section id="modal" class="modal panel" role="dialog" aria-modal="true" aria-label="Network briefing" hidden><div id="modal-body"></div></section>
+<div id="toast-stack" class="toast-stack" role="status" aria-live="polite"></div>
+<div id="boot" class="boot"><div class="boot-spinner"></div><strong>Preparing your little corner of the universe…</strong><span>All graphics, geography and simulation run in your browser.</span></div>
+<input type="file" id="save-import" accept="application/json,.json" hidden>
+<noscript><div class="fatal">This game needs JavaScript enabled. Your browser runs the entire simulation locally.</div></noscript>
+<script type="module" src="app.js"></script>
+</body>
+</html>
