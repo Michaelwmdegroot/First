@@ -1,0 +1,22 @@
+name: Alien Invader browser build
+on:
+  push:
+    branches: [alien-invader-browser-v1]
+    paths: ['alien-invader/**', '.github/workflows/alien-invader-browser.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate game JavaScript
+        run: |
+          for file in alien-invader/*.js; do node --check "$file"; done
+      - name: Package browser game
+        uses: actions/upload-artifact@v4
+        with:
+          name: alien-invader-browser
+          path: alien-invader/
+          retention-days: 30
