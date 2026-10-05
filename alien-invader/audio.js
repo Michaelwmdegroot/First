@@ -1,0 +1,9 @@
+// Original synthesized interface sounds and an unhurried pentatonic soundscape. No sampled media.
+export class AudioEngine{
+ constructor(){this.context=null;this.enabled=true;this.music=true;this.timer=null;this.step=0;this.intensity=0;}
+ unlock(){if(!this.context){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;this.context=new C();this.master=this.context.createGain();this.master.gain.value=.22;this.master.connect(this.context.destination);}this.context.resume().catch(()=>{});if(!this.timer)this.timer=setInterval(()=>this.ambient(),850);}
+ set(sound,music){this.enabled=!!sound;this.music=!!music;}
+ tone(freq,time=.1,volume=.3,delay=0,type='sine'){if(!this.context||!this.enabled)return;const t=this.context.currentTime+delay,o=this.context.createOscillator(),g=this.context.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(volume,t+.015);g.gain.exponentialRampToValueAtTime(.001,t+time);o.connect(g);g.connect(this.master);o.start(t);o.stop(t+time+.03);}
+ play(kind='click'){if(!this.enabled)return;this.unlock();if(kind==='success'){[523.25,659.25,783.99].forEach((f,i)=>this.tone(f,.24,.16,i*.075));}else if(kind==='warning'){this.tone(349.23,.18,.16);this.tone(293.66,.25,.13,.14);}else if(kind==='event'){this.tone(392,.6,.16);this.tone(587.33,.6,.12,.2);}else if(kind==='start'){[261.63,329.63,392,523.25].forEach((f,i)=>this.tone(f,.6,.13,i*.1));}else this.tone(680,.055,.12);}
+ ambient(){if(!this.context||!this.enabled||!this.music||document.hidden)return;const melody=[0,7,12,16,14,7,9,12,0,4,7,9,12,7,4,2];const n=melody[this.step%melody.length];const root=this.intensity>65?110:130.813;const f=root*Math.pow(2,n/12);this.tone(f,1.5,.036,0,'sine');if(this.step%4===0){this.tone(root*.5,3.2,.035);this.tone(root*1.5,2.8,.014,.15);}this.step++;}
+}
