@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#111111">
+  <title>Personal FireRed · V0.1</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="topbar">
+      <div>
+        <span class="version">PERSONAL FIRERED · V0.1</span>
+        <strong>Web Native</strong>
+      </div>
+      <span id="status" class="status">Starting FireRed…</span>
+    </header>
+
+    <section class="display" aria-label="FireRed game display">
+      <canvas id="screen" width="240" height="160" tabindex="0" aria-label="FireRed game screen"></canvas>
+    </section>
+
+    <section class="controls" data-game-controls aria-label="Game controls">
+      <div class="shoulders">
+        <button type="button" data-key-mask="512" aria-label="L button">L</button>
+        <button type="button" data-key-mask="256" aria-label="R button">R</button>
+      </div>
+
+      <div class="control-row">
+        <div class="dpad" aria-label="Directional pad">
+          <button class="up" type="button" data-key-mask="64" aria-label="Up">▲</button>
+          <button class="left" type="button" data-key-mask="32" aria-label="Left">◀</button>
+          <div class="dpad-center" aria-hidden="true"></div>
+          <button class="right" type="button" data-key-mask="16" aria-label="Right">▶</button>
+          <button class="down" type="button" data-key-mask="128" aria-label="Down">▼</button>
+        </div>
+
+        <div class="face-buttons" aria-label="Action buttons">
+          <button class="b" type="button" data-key-mask="2" aria-label="B button">B</button>
+          <button class="a" type="button" data-key-mask="1" aria-label="A button">A</button>
+        </div>
+      </div>
+
+      <div class="system-buttons">
+        <button type="button" data-key-mask="4">SELECT</button>
+        <button type="button" data-key-mask="8">START</button>
+      </div>
+    </section>
+
+    <p class="desktop-help">Keyboard: arrows · Z = A · X = B · Enter = Start · Backspace = Select · A/S = L/R</p>
+  </main>
+
+  <script>
+    var Module = {
+      canvas: document.getElementById('screen'),
+      print: (...args) => console.log(...args),
+      printErr: (...args) => console.error(...args),
+      onRuntimeInitialized() {
+        const status = document.getElementById('status');
+        status.textContent = 'WASM ready - entering main';
+        status.classList.add('ready');
+        window.FireRedApplyTouchState?.();
+        this.canvas?.focus();
+      },
+      onAbort(reason) {
+        const status = document.getElementById('status');
+        const detail = String(reason ?? 'unknown abort');
+        status.textContent = 'Abort: ' + detail.replace(/\s+/g, ' ').slice(0, 180);
+        status.title = detail;
+        status.classList.add('error');
+        console.error('FireRed aborted:', reason);
+      }
+    };
+
+    window.addEventListener('error', (event) => {
+      const status = document.getElementById('status');
+      const err = event.error;
+      const detail = err?.stack || err?.message || event.message || 'unknown runtime error';
+      status.textContent = 'Runtime: ' + detail.replace(/\s+/g, ' ').slice(0, 180);
+      status.title = detail;
+      status.classList.add('error');
+      console.error('FireRed window error:', err || event.message);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      const status = document.getElementById('status');
+      const reason = event.reason;
+      const detail = reason?.stack || reason?.message || String(reason ?? 'unknown rejection');
+      status.textContent = 'Runtime: ' + detail.replace(/\s+/g, ' ').slice(0, 180);
+      status.title = detail;
+      status.classList.add('error');
+      console.error('FireRed rejected promise:', reason);
+    });
+  </script>
+  <script src="controls.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
