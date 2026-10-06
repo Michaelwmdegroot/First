@@ -1,0 +1,11 @@
+{
+  "name": "alien-invader-simulator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A browser-native, original alternate-history strategy campaign based on Alien Invader Simulator GDD v1.0.",
+  "scripts": {
+    "test": "node tests/simulation.mjs",
+    "serve": "python3 -m http.server 8000"
+  }
+}
