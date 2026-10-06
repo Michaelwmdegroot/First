@@ -40,8 +40,9 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&game?.s.st
 function frame(t){requestAnimationFrame(frame);if(!game)return;const elapsed=lastFrame?Math.min((t-lastFrame)/1000,.15):0;lastFrame=t;
  if(!ui.title&&!ui.modal&&!document.hidden&&game.s.speed&&!game.s.ended){accumulator+=elapsed*game.s.pace*game.s.speed;const n=Math.min(120,Math.floor(accumulator));if(n){const actual=game.advance(n);accumulator-=actual;if(actual<n)accumulator=0;}}
  if(game.s.eventQueue.length&&!ui.title&&(!ui.modal||ui.modal.kind==='event'))showEvent();if(game.s.ended&&!endingSeen&&!ui.title)showEnding();
- if(t-lastHUD>350){renderHUD();notices();lastHUD=t;if(game.s.started&&game.s.day-game.s.lastSave>=365)persist(true,true);}
- if(ui.screen&&!ui.modal&&t-lastDrawer>1200&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)){renderDrawer();lastDrawer=t;}
+ // Paused planning is stable DOM: never replace a button under the pointer.
+ // All actions explicitly redraw affected screens; the clock only refreshes changed HUD state.
+ if(t-lastHUD>500){const key=[game.s.day,game.s.speed,game.s.jobs.length,ui.title,ui.selected].join(':');if(key!==frame.hudKey){renderHUD();frame.hudKey=key;}notices();lastHUD=t;if(game.s.started&&game.s.day-game.s.lastSave>=365)persist(true,true);}
 }
 async function boot(){try{world=await loadWorld();game=new Game(world.defs);game.s.settings.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
  $('brand-alien').innerHTML=mascot(43);$('help-button').innerHTML=icon('help',19);$('settings-button').innerHTML=icon('settings',19);$('drawer-close').innerHTML=icon('close',20);$('zoom-in').innerHTML=icon('plus',16);$('zoom-out').innerHTML=icon('minus',16);$('focus-button').innerHTML=icon('scan',16);$('quick-save-button').innerHTML=icon('save',19);
