@@ -1,4 +1,4 @@
-name: Alien Invader browser build
+name: Alien Invader browser release
 on:
   push:
     branches: [alien-invader-browser-v1]
@@ -12,39 +12,64 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           ref: alien-invader-browser-v1
-      - name: Vendor pinned browser dependencies
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assemble and verify tested browser sources
         run: |
-          if [ ! -f alien-invader/vendor/three.module.js ]; then
-            mkdir -p /tmp/ais-three /tmp/ais-world alien-invader/vendor
-            cd /tmp/ais-three
-            npm pack three@0.180.0 --ignore-scripts
-            tar -xzf three-0.180.0.tgz
-            cd /tmp/ais-world
-            npm pack world-atlas@2.0.2 --ignore-scripts
-            tar -xzf world-atlas-2.0.2.tgz
-            cd "$GITHUB_WORKSPACE"
-            cp /tmp/ais-three/package/build/three.module.js alien-invader/vendor/
-            cp /tmp/ais-three/package/build/three.core.js alien-invader/vendor/
-            cp /tmp/ais-three/package/examples/jsm/controls/OrbitControls.js alien-invader/vendor/
-            cp /tmp/ais-three/package/LICENSE alien-invader/vendor/THREE-LICENSE.txt
-            cp /tmp/ais-world/package/countries-50m.json alien-invader/vendor/
-            cp /tmp/ais-world/package/LICENSE alien-invader/vendor/WORLD-ATLAS-LICENSE.txt
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add alien-invader/vendor
-            git commit -m 'build(alien-invader): vendor Three.js 0.180.0 and World Atlas 2.0.2'
-            git pull --rebase origin alien-invader-browser-v1
+          mkdir -p qa-results
+          node alien-invader/build.mjs
+          for file in alien-invader/*.js; do node --input-type=module --check < "$file"; done
+      - name: Deterministic system acceptance
+        run: node alien-invader/tests/simulation.mjs | tee qa-results/simulation.txt
+      - name: Five normal-action campaign victories
+        env:
+          QA_REPORT: qa-results/campaigns.json
+        run: node alien-invader/tests/campaign.mjs | tee qa-results/campaigns.txt
+      - name: Install isolated browser QA dependencies
+        run: |
+          npm install --no-save --no-package-lock playwright@1.55.1
+          npx playwright install --with-deps chromium webkit
+      - name: Real browser acceptance and screenshots
+        env:
+          QA_DIR: qa-results/browser
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 --directory alien-invader > qa-results/server.log 2>&1 &
+          for n in $(seq 1 20); do curl --fail --silent http://127.0.0.1:8000/index.html > /dev/null && break; sleep 1; done
+          node alien-invader/tests/browser.mjs | tee qa-results/browser.txt
+      - name: Commit verified static runtime on isolated game branch
+        id: publish
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add alien-invader/app.js alien-invader/style.css alien-invader/engine.js alien-invader/globe.js
+          if ! git diff --cached --quiet; then
+            git commit -m 'release(alien-invader): publish verified playable browser runtime'
             git push origin HEAD:alien-invader-browser-v1
           fi
-      - name: Validate game JavaScript
-        run: |
-          for file in alien-invader/*.js; do node --input-type=module --check < "$file"; done
-          if [ -f alien-invader/tests/simulation.mjs ]; then node alien-invader/tests/simulation.mjs; fi
-      - name: Package browser game
+          REVISION=$(git rev-parse HEAD)
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
+          echo "https://rawcdn.githack.com/Michaelwmdegroot/First/$REVISION/alien-invader/index.html" | tee qa-results/play-url.txt
+      - name: Verify public rawgithack deployment
+        env:
+          QA_DIR: qa-results/live
+          LIVE: '1'
+          PLAY_URL: https://rawcdn.githack.com/Michaelwmdegroot/First/${{ steps.publish.outputs.revision }}/alien-invader/index.html
+        run: node alien-invader/tests/browser.mjs | tee qa-results/live.txt
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alien-invader-qa
+          path: qa-results/
+          retention-days: 30
+      - name: Package complete browser game
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: alien-invader-browser
