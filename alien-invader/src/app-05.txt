@@ -1,0 +1,52 @@
+ case'confirm-evacuate':confirm('Abandon this installation?','The base, its modules and its unfinished module work will be lost. If this is your last base, the campaign ends.','evacuate',d.id);break;
+ case'confirm-recall':confirm('Bring your colleague home?','This interface leaves its human role permanently. Its cover career and institutional access are lost.','recall',d.id);break;
+ case'confirm-break':confirm('End this secret accord?','Your partner loses trust, grows more hostile and remembers the decision. All treaty benefits stop.','break',d.id);break;
+ case'confirmed':{const f={recycle:()=>game.recycleCraft(d.id),evacuate:()=>{game.evacuate(d.id);return{ok:true};},recall:()=>game.agentAction(d.id,'recall'),break:()=>game.breakTreaty(d.id),emergency:()=>game.emergency()};if(f[d.kind])apply(f[d.kind]());break;}
+ case'agent-action':confirm(d.kind==='promote'?'Seek a promotion?':'Steer institutional policy?',d.kind==='promote'?'An eight-month assignment raises access by 18, but attracts scrutiny. A one-year cooldown follows.':'A six-month assignment creates leverage and dependency. Its extra benefit depends on the institution; it also increases suspicion and pattern signature.',d.kind==='promote'?'agent-promote':'agent-policy',d.id,d.kind==='promote'?{intel:12,influence:game.tech('human4')?9:12}:{intel:8,influence:10});break;
+ case'propose':apply(game.propose(ui.selected,ui.clauses,ui.offer),false);break;
+ case'renew':apply(game.renewTreaty(d.id),false);break;
+ case'trade':{const input=$('order-'+d.id);const quantity=Number(input?.value);apply(game.trade(d.id,quantity,d.buy==='1'),false);break;}
+ case'upgrade-front':apply(game.upgradeFront(d.id),false);break;
+ case'front-cover':apply(game.frontCover(d.id),false);break;
+ case'character':{const cost=d.kind==='monitor'?{intel:10}:d.kind==='contact'?{intel:15,influence:12}:{intel:8,influence:15};const text=d.kind==='monitor'?'Monitor sources: returns 5 Intel and reduces Coherence by 2.':d.kind==='contact'?'Careful contact: public Trust +6, Belief +5 and Coherence +3.':'Misdirection: Coherence −6, Belief +4 and Pattern +4. Repeated noise has long-term consequences.';showModal('character',modalHead('A VERY PUBLIC CONVERSATION',CHARACTERS.find(c=>c.id===d.id).name)+`<p>${text} A one-year cooldown follows.</p><div style="margin-top:15px">${costs(cost)}</div><div class="modal-actions">${btn('Cancel','close-modal','','secondary')}${btn('Make contact with the story','character-confirm',`${attr('id',d.id)} ${attr('kind',d.kind)}`,'primary',!game.sufficient(cost))}</div>`);break;}
+ case'character-confirm':apply(game.characterAction(d.id,d.kind));break;
+ case'event-choice':{const r=game.choose(d.id);if(r.ok){closeModal(true);eventSeen=null;persist(true,true);renderAll();if(game.s.eventQueue.length)showEvent();else toast('Decision recorded. Press Space or ▶ to continue.');}else notices();break;}
+ case'finalize':{const r=game.finalize();if(r.ok){closeModal(true);showEnding();}else notices();break;}
+ case'ending-archive':closeModal(true);openDrawer('archive');break;
+ case'settings':showSettings();break;case'help':showHelp();break;case'about':showAbout();break;
+ case'sound':game.s.settings.sound=!game.s.settings.sound;audio.set(game.s.settings.sound,game.s.settings.music);if(game.s.settings.sound)audio.play('click');renderHUD();persist(true);break;
+ case'quick-save':persist(false);break;
+ case'export':download(`Alien-Invader-${game.year}-${game.s.seed.replace(/[^a-z0-9-]/gi,'_').slice(0,30)}.json`,game.export());toast('Portable campaign save exported.');break;
+ case'import':$('save-import').click();break;
+ case'restore-backup':{const raw=localStorage.getItem(SAVE+'-backup1');if(!raw){toast('No backup snapshot is available yet.','warning');break;}const restored=Game.restore(raw,world.defs);game=restored;enterGame();toast('Previous autosave restored. Time is paused.');break;}
+ case'fullscreen':if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else toast('Use your browser’s full-screen command on this device.');break;
+ case'reload':location.reload();break;
+ }
+ if(a==='confirmed'&&['agent-promote','agent-policy'].includes(d.kind))apply(game.agentAction(d.id,d.kind==='agent-promote'?'promote':'policy'));
+ }catch(error){console.error(error);toast('That action could not complete: '+error.message,'warning');} }
+document.addEventListener('click',handleAction);
+document.addEventListener('change',e=>{if(!game)return;const el=e.target;try{
+ if(el.dataset.clause){const k=el.dataset.clause;if(el.checked&&!ui.clauses.includes(k)){if(ui.clauses.length>=4){el.checked=false;toast('An agreement can contain at most four clauses.','warning');return;}ui.clauses.push(k);}if(!el.checked)ui.clauses=ui.clauses.filter(x=>x!==k);renderDrawer();}
+ const setting=el.dataset.setting;if(setting==='selected'){select(el.value);return;}if(['base','institution','offer','tree','bloc'].includes(setting)){ui[setting]=el.value;renderDrawer();}if(setting==='pace'){game.s.pace=Number(el.value);accumulator=0;renderHUD();persist(true);}
+ if(el.dataset.option){game.s.settings[el.dataset.option]=el.checked;renderHUD();persist(true);}
+ }catch(error){toast(error.message,'warning');}});
+let searchTimer;document.addEventListener('input',e=>{if(e.target.dataset.input!=='country-search')return;ui.search=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(()=>{const pos=e.target.selectionStart;renderDrawer();const input=document.querySelector('[data-input="country-search"]');input?.focus({preventScroll:true});input?.setSelectionRange(pos,pos);},140);});
+$('save-import').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>8_000_000)throw new Error('Save file is too large. Maximum 8 MB.');const restored=Game.restore(await file.text(),world.defs);persist(true,true);game=restored;endingSeen=false;eventSeen=null;enterGame();toast('Imported campaign restored. Time is paused.');}catch(error){toast(error.message,'warning');}e.target.value='';});
+$('drawer-scrim').addEventListener('click',()=>closeDrawer());$('modal-scrim').addEventListener('click',()=>closeModal());
+document.addEventListener('keydown',e=>{const typing=['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName);if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();persist(false);return;}if(e.key==='Escape'){if(ui.modal)closeModal();else closeDrawer();return;}if(typing)return;
+ if(e.key==='Tab'&&ui.modal){const els=[...$('modal').querySelectorAll('button:not(:disabled),input,select,a[href]')].filter(n=>n.offsetParent!==null);if(els.length){const first=els[0],last=els[els.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}return;}
+ if(e.code==='Space'){e.preventDefault();if(!ui.modal)setSpeed(game?.s.speed?0:1);}if(!ui.modal&&['1','2','3','4'].includes(e.key)){e.preventDefault();setSpeed({1:1,2:2,3:4,4:8}[e.key]);}if(!ui.modal&&!ui.screen&&e.key.startsWith('Arrow')){e.preventDefault();globe?.rotate(e.key==='ArrowLeft'?-.15:e.key==='ArrowRight'?.15:0,e.key==='ArrowUp'?-.1:e.key==='ArrowDown'?.1:0);}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&game?.s.started){pause();persist(true);renderHUD();}});window.addEventListener('pagehide',()=>{pause();persist(true);});
+function frame(t){requestAnimationFrame(frame);if(!game)return;const elapsed=lastFrame?Math.min((t-lastFrame)/1000,.15):0;lastFrame=t;
+ if(!ui.title&&!ui.modal&&!document.hidden&&game.s.speed&&!game.s.ended){accumulator+=elapsed*game.s.pace*game.s.speed;const n=Math.min(120,Math.floor(accumulator));if(n){const actual=game.advance(n);accumulator-=actual;if(actual<n)accumulator=0;}}
+ if(game.s.eventQueue.length&&!ui.title&&(!ui.modal||ui.modal.kind==='event'))showEvent();if(game.s.ended&&!endingSeen&&!ui.title)showEnding();
+ if(t-lastHUD>350){renderHUD();notices();lastHUD=t;if(game.s.started&&game.s.day-game.s.lastSave>=365)persist(true,true);}
+ if(ui.screen&&!ui.modal&&t-lastDrawer>1200&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)){renderDrawer();lastDrawer=t;}
+}
+async function boot(){try{world=await loadWorld();game=new Game(world.defs);game.s.settings.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ $('brand-alien').innerHTML=mascot(43);$('help-button').innerHTML=icon('help',19);$('settings-button').innerHTML=icon('settings',19);$('drawer-close').innerHTML=icon('close',20);$('zoom-in').innerHTML=icon('plus',16);$('zoom-out').innerHTML=icon('minus',16);$('focus-button').innerHTML=icon('scan',16);$('quick-save-button').innerHTML=icon('save',19);
+ try{globe=new Globe($('globe'),world,id=>{if(ui.title)return;select(id,false);},id=>{ui.base=id;openDrawer('bases');});}catch(error){console.warn('Using compatibility globe:',error.message);globe=new FallbackGlobe($('globe'),world,id=>{if(!ui.title)select(id,false);},id=>{ui.base=id;openDrawer('bases');});}
+ $('continue-button').hidden=!hasSave();$('new-game-button').disabled=false;$('new-game-button').innerHTML=`Begin your invasion ${icon('arrow',18)}`;$('boot').hidden=true;document.body.classList.remove('is-loading');renderAll();requestAnimationFrame(frame);window.__AIS_READY__=true;
+ if(new URLSearchParams(location.search).has('test'))window.__AIS_TEST__={get game(){return game;},get world(){return world;},get ui(){return ui;},get globe(){return globe;},Game,advance(days,options={}){pause();const result=game.advance(days,options);renderAll();return result;},refresh(){renderAll();},setGame(g){game=g;endingSeen=false;closeModal(true);enterGame();},open:openDrawer,preview:showPreview};
+ }catch(error){console.error(error);$('boot').classList.add('error');$('boot').innerHTML=`${icon('alert',36)}<strong>The Network could not reach Earth.</strong><span>${esc(error.message)}</span><button class="button primary" data-action="reload">Try again</button>`;}}
+boot();
