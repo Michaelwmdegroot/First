@@ -1,0 +1,16 @@
+
+/* The oversized globe sits inside a fixed clipping viewport, never widening the page. */
+#globe-viewport{position:fixed;inset:0;overflow:hidden;pointer-events:none}
+#globe-viewport #globe{pointer-events:auto}
+@media(max-width:580px){
+ .bottom-dock{display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:7px}
+ .time-panel{min-width:0;gap:5px;justify-content:space-between}
+ .time-controls button[data-speed="1"]{display:none}
+ .operation-strip{min-width:0;overflow:hidden}
+ .job-chip{min-width:64px;max-width:64px;padding:8px 6px}
+ .job-chip small span:first-child{display:none}
+ .job-chip small{justify-content:center}
+ .idle-chip{min-width:64px;width:64px;justify-content:center;padding:8px}
+ .idle-chip span{display:none}
+ .idle-chip .icon{width:22px;height:22px}
+}
