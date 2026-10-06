@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           node alien-invader/tests/simulation.mjs | tee qa-results/simulation.txt
-      - name: Five normal-action campaign victories
+      - name: Six normal-action campaign victories
         env:
           QA_REPORT: qa-results/campaigns.json
         run: |
@@ -67,16 +67,26 @@ jobs:
           fi
           REVISION=$(git rev-parse HEAD)
           echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
-          echo "https://rawcdn.githack.com/Michaelwmdegroot/First/$REVISION/alien-invader/index.html" | tee qa-results/play-url.txt
-      - name: Verify public rawgithack deployment
+          echo "https://raw.githack.com/Michaelwmdegroot/First/alien-invader-browser-v1/alien-invader/index.html" | tee qa-results/play-url.txt
+          echo "https://rawcdn.githack.com/Michaelwmdegroot/First/$REVISION/alien-invader/index.html" | tee qa-results/pinned-url.txt
+      - name: Verify public raw.githack branch deployment
         env:
           QA_DIR: qa-results/live
           LIVE: '1'
-          PLAY_URL: https://rawcdn.githack.com/Michaelwmdegroot/First/${{ steps.publish.outputs.revision }}/alien-invader/index.html
+          PLAY_URL: https://raw.githack.com/Michaelwmdegroot/First/alien-invader-browser-v1/alien-invader/index.html
         run: |
           set -euo pipefail
           node alien-invader/tests/browser.mjs | tee qa-results/live.txt
           test -s qa-results/live/report.json
+      - name: Verify pinned rawcdn.githack deployment
+        env:
+          QA_DIR: qa-results/live-pinned
+          LIVE: '1'
+          PLAY_URL: https://rawcdn.githack.com/Michaelwmdegroot/First/${{ steps.publish.outputs.revision }}/alien-invader/index.html
+        run: |
+          set -euo pipefail
+          node alien-invader/tests/browser.mjs | tee qa-results/live-pinned.txt
+          test -s qa-results/live-pinned/report.json
       - name: Upload acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4

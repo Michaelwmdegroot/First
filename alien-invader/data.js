@@ -1,12 +1,12 @@
 // Alien Invader Simulator — browser campaign. All political ratings are fictional game values.
-export const VERSION='1.0.0-browser';
+export const VERSION='1.0.1-browser';
 export const START=Date.UTC(1945,0,1), DAY=86400000, END=Date.UTC(2046,0,1);
 export const clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b,v));
 export const RESOURCES={
  energy:{name:'Energy',short:'Energy',icon:'energy',color:'#edb43f',cap:180},
  intel:{name:'Intel',short:'Intel',icon:'scan',color:'#53a9c5',cap:999},
  influence:{name:'Influence',short:'Influence',icon:'spark',color:'#b48cd8',cap:999},
- capital:{name:'Human capital',short:'Capital',icon:'coin',color:'#dab456',cap:99999},
+ capital:{name:'Human capital',short:'Human capital',icon:'coin',color:'#dab456',cap:99999},
  common:{name:'Common metals',short:'Metal',icon:'metal',color:'#849aa8',cap:300},
  precious:{name:'Precious metals',short:'Gold',icon:'gold',color:'#eab848',cap:150},
  rare:{name:'Rare elements',short:'Rare',icon:'crystal',color:'#82b9c8',cap:150},
@@ -24,6 +24,19 @@ export const BLOCS={
  arabia:{name:'Arabian Union',early:'Gulf & Regional Partners',color:'#e6b69c',tag:'ENERGY & LOGISTICS',desc:'A fictional potential coalition of capital, energy and transport partners. Sovereignty matters.',strength:'Energy corridors support extra generation.',friction:'Regional unity must be earned, not assumed.',sovereignty:90,appetite:75,discipline:70,fragment:65,science:66,threat:63,industry:70,sensors:25},
  asia:{name:'Asian Union',early:'Asia-Pacific Network',color:'#a7ccd0',tag:'PRECISION & TRADE',desc:'A fictional potential coalition excluding China. Trade networks favor subtle industrial access.',strength:'Advanced logistics reduce market footprint.',friction:'Rival technology deals can strain trust.',sovereignty:74,appetite:85,discipline:65,fragment:80,science:83,threat:58,industry:86,sensors:32},
  independent:{name:'Independent Partners',early:'Independent Partners',color:'#c4caa4',tag:'NEW POSSIBILITIES',desc:'Independent states pursue their own security, growth and scientific goals.',strength:'Flexible entry points for the Network.',friction:'Each partner has its own priorities.',sovereignty:70,appetite:75,discipline:58,fragment:65,science:62,threat:50,industry:62,sensors:24}
+};
+export const UNITED_NATIONS={
+ name:'United Nations',icon:'globe',tag:'GLOBAL FORUM & LEGITIMACY',
+ desc:'A global forum rather than a sovereign bloc. It can legitimize disclosure, inspections and planetary cooperation, but depends on member support.',
+ strength:'Turns many country-level relationships into global legitimacy and shared inspection rules.',
+ friction:'Limited direct enforcement; public evidence and member-state rivalry can pull the institution apart.',
+ actions:{
+  liaison:{name:'Open mission backchannel',desc:'Approach a small diplomatic channel and establish that the Network is real.',year:1946,cost:{intel:12,influence:4}},
+  brief:{name:'Brief the scientific panel',desc:'Share bounded evidence with a multinational scientific group. Trust rises, but so does institutional knowledge.',year:1946,cost:{intel:18,influence:14}},
+  network:{name:'Build an institutional network',desc:'Use embedded human careers across several regions to create durable access inside the forum.',year:1960,cost:{intel:22,influence:18,capital:20}},
+  framework:{name:'Negotiate an inspection framework',desc:'Create rules for evidence handling, inspection and deconfliction without going public.',year:1980,cost:{intel:30,influence:30,capital:30}},
+  mandate:{name:'Seek a disclosure mandate',desc:'Ask the global forum to introduce the Network publicly under an agreed legitimacy framework.',year:2017,cost:{intel:40,influence:45,capital:40}}
+ }
 };
 const eu=[8,20,40,56,70,100,112,191,196,203,208,233,234,246,250,276,292,300,336,348,352,372,380,428,438,440,442,470,492,498,499,528,578,616,620,642,674,688,703,705,724,752,756,804,807,826];
 const af=[12,24,72,108,120,132,140,148,174,175,178,180,204,226,231,232,262,266,270,288,324,384,404,426,430,434,450,454,466,478,480,504,508,516,562,566,624,638,646,654,678,686,690,694,706,710,716,728,729,732,748,768,788,800,818,834,854,894];

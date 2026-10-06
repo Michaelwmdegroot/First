@@ -42,6 +42,11 @@ for(const name of browsers){
  await page.evaluate(()=>window.__AIS_TEST__.advance(60));
  assert.equal(await page.evaluate(()=>window.__AIS_TEST__.game.s.stats.observe),1);
  await page.click('[data-action="claim-guide"]');
+ // The global institution is a real playable diplomacy channel, not a static lore card.
+ await page.evaluate(()=>{const g=window.__AIS_TEST__.game;g.s.day=365;g.gain({intel:50,influence:50});window.__AIS_TEST__.refresh();});
+ await page.click('.nav-item[data-screen="diplomacy"]');await page.click('#drawer-tabs [data-tab="un"]');
+ const unLiaison=page.locator('[data-action="un-action"][data-id="liaison"]');assert.ok(await unLiaison.isEnabled());await unLiaison.click();
+ assert.equal(await page.evaluate(()=>window.__AIS_TEST__.game.s.un.contact),2);if(await page.locator('#drawer:visible').count())await page.click('#drawer-close');
  await page.waitForTimeout(4400);await page.screenshot({path:`${out}/${name}-earth.png`});
  // Pause controls and one-day stepping preserve a consistent state.
  await page.keyboard.press('Space');await page.waitForTimeout(1100);await page.keyboard.press('Space');

@@ -1,4 +1,4 @@
-# Alien Invader Simulator — Browser Edition 1.0
+# Alien Invader Simulator — Browser Edition 1.0.1
 
 **Big plans. Small planet.** An original, single-player covert strategy/management campaign, 1945–2045. You are a resource-constrained alien network, not an action-game pilot.
 
@@ -32,17 +32,17 @@ The game stores an active campaign and two rolling backup snapshots in browser s
 
 ## Implemented systems
 
-- Interactive spherical Earth; 241 selectable country/territory entities; seven strategic region personalities.
+- Interactive spherical Earth; 241 selectable country/territory entities; seven strategic region personalities plus a separate United Nations institution.
 - A deterministic daily simulation from 1945 through 2045 with pause and configurable pacing.
 - Eight base types, nine module types, eight craft classes and constrained fabrication/command capacity.
 - Resource extraction, salvage, legal market access, priced commodity classes, front companies, financial trace and technology-for-access deals.
 - Four biological-interface routes, institutional careers, promotion, policy influence, suspicion, attachment and loyalty events.
-- Country backchannels, custom secret accords with up to four of ten clauses, expiry/renewal, memories, rivalry and adaptive human research.
+- Country backchannels, a separate United Nations legitimacy/inspection channel, custom secret accords with up to four of ten clauses, expiry/renewal, memories, rivalry and adaptive human research.
 - Separate belief, evidence, coherence, panic, trust and pattern metrics. Public hard evidence is not magically erased by rumor.
 - Twelve persistent narrative types, fictional public characters and three Project Blue Veil strategies.
 - Forty-eight alien research nodes in eight disciplines, plus era-driven human technological pressure.
 - Sixty-three event definitions: 33 timeline entries, 20 dynamic incidents and 10 special events. Choices and historical echoes leave persistent consequences.
-- Six selectable final-project victories and two failure epilogues; disclosure is not automatically game over.
+- Six selectable final-project victories and two failure epilogues; both cooperative and coercive disclosure can occur without automatically ending the campaign.
 - Original procedural scenery, character art, icons and Web Audio soundscape; responsive desktop/tablet/phone panels and a spherical Canvas compatibility renderer when WebGL2 is unavailable.
 
 ## Scope relative to the design document
@@ -70,9 +70,9 @@ Core boundaries: `data.js` definitions, `events.js` event content, `engine.js` d
 
 ## Tests
 
-`tests/simulation.mjs` has 16 suites covering startup, resources, prerequisites, job cancellation, legal market access, persistent evidence, treaty behavior, careers, save determinism/validation, all event affordability fallbacks and all six final-project resolvers. Some narrow resolver tests use explicitly marked fixture states.
+`tests/simulation.mjs` has 18 suites covering startup, resources, prerequisites, job cancellation, legal market access, persistent evidence, treaty behavior, careers, save determinism/validation, all event affordability fallbacks and all six final-project resolvers. Some narrow resolver tests use explicitly marked fixture states.
 
-`tests/campaign.mjs` additionally plays five whole campaigns using only normal player actions, without resource or technology grants, and asserts five different successful endings. It is a reachability smoke test, not a substitute for human fun/balance testing.
+`tests/campaign.mjs` additionally plays six whole campaigns using only normal player actions, without resource or technology grants, and asserts all six selectable successful endings. It is a reachability smoke test, not a substitute for human fun/balance testing.
 
 `tests/browser.mjs` tests real-origin Chromium and WebKit: all panels/tabs, starting a mission, claiming a reward, pause, reload/continue, actual save download/import, malformed-save rejection, country selection, a zero-reserve incident, small-screen layout and standby pause. Run it with Playwright installed, a local HTTP server and optional `PLAY_URL` / `QA_DIR` environment variables. `LIVE=1` selects only Chromium for deployment smoke testing. Browser screenshots and reports are uploaded by the workflow. `?test=1` exposes a QA hook; normal play does not require it.
 

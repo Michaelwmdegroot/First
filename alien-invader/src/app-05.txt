@@ -1,10 +1,12 @@
  case'confirm-evacuate':confirm('Abandon this installation?','The base, its modules and its unfinished module work will be lost. If this is your last base, the campaign ends.','evacuate',d.id);break;
  case'confirm-recall':confirm('Bring your colleague home?','This interface leaves its human role permanently. Its cover career and institutional access are lost.','recall',d.id);break;
  case'confirm-break':confirm('End this secret accord?','Your partner loses trust, grows more hostile and remembers the decision. All treaty benefits stop.','break',d.id);break;
- case'confirmed':{const f={recycle:()=>game.recycleCraft(d.id),evacuate:()=>{game.evacuate(d.id);return{ok:true};},recall:()=>game.agentAction(d.id,'recall'),break:()=>game.breakTreaty(d.id),emergency:()=>game.emergency()};if(f[d.kind])apply(f[d.kind]());break;}
+ case'confirmed':{const f={recycle:()=>game.recycleCraft(d.id),evacuate:()=>{game.evacuate(d.id);return{ok:true};},recall:()=>game.agentAction(d.id,'recall'),break:()=>game.breakTreaty(d.id),emergency:()=>game.emergency(),'disclose-authority':()=>game.disclose('authority')};if(f[d.kind])apply(f[d.kind]());break;}
  case'agent-action':confirm(d.kind==='promote'?'Seek a promotion?':'Steer institutional policy?',d.kind==='promote'?'An eight-month assignment raises access by 18, but attracts scrutiny. A one-year cooldown follows.':'A six-month assignment creates leverage and dependency. Its extra benefit depends on the institution; it also increases suspicion and pattern signature.',d.kind==='promote'?'agent-promote':'agent-policy',d.id,d.kind==='promote'?{intel:12,influence:game.tech('human4')?9:12}:{intel:8,influence:10});break;
  case'propose':apply(game.propose(ui.selected,ui.clauses,ui.offer),false);break;
  case'renew':apply(game.renewTreaty(d.id),false);break;
+ case'un-action':apply(game.unAction(d.id),false);break;
+ case'disclose-authority':confirm('End the century of secrecy?','Declare the Network as an open administrative power. This creates durable public evidence, raises panic and makes human resistance more likely. The campaign continues after disclosure.','disclose-authority','',game.disclosurePreview('authority').cost);break;
  case'trade':{const input=$('order-'+d.id);const quantity=Number(input?.value);apply(game.trade(d.id,quantity,d.buy==='1'),false);break;}
  case'upgrade-front':apply(game.upgradeFront(d.id),false);break;
  case'front-cover':apply(game.frontCover(d.id),false);break;
