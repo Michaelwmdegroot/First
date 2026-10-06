@@ -9,6 +9,9 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: write
+defaults:
+  run:
+    shell: bash
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -22,15 +25,21 @@ jobs:
           node-version: '22'
       - name: Assemble and verify tested browser sources
         run: |
+          set -euo pipefail
           mkdir -p qa-results
           node alien-invader/build.mjs
           for file in alien-invader/*.js; do node --input-type=module --check < "$file"; done
       - name: Deterministic system acceptance
-        run: node alien-invader/tests/simulation.mjs | tee qa-results/simulation.txt
+        run: |
+          set -euo pipefail
+          node alien-invader/tests/simulation.mjs | tee qa-results/simulation.txt
       - name: Five normal-action campaign victories
         env:
           QA_REPORT: qa-results/campaigns.json
-        run: node alien-invader/tests/campaign.mjs | tee qa-results/campaigns.txt
+        run: |
+          set -euo pipefail
+          node alien-invader/tests/campaign.mjs | tee qa-results/campaigns.txt
+          test -s qa-results/campaigns.json
       - name: Install isolated browser QA dependencies
         run: |
           npm install --no-save --no-package-lock playwright@1.55.1
@@ -39,12 +48,16 @@ jobs:
         env:
           QA_DIR: qa-results/browser
         run: |
+          set -euo pipefail
           python3 -m http.server 8000 --bind 127.0.0.1 --directory alien-invader > qa-results/server.log 2>&1 &
           for n in $(seq 1 20); do curl --fail --silent http://127.0.0.1:8000/index.html > /dev/null && break; sleep 1; done
           node alien-invader/tests/browser.mjs | tee qa-results/browser.txt
+          test -s qa-results/browser/report.json
+          node -e "const r=require('./qa-results/browser/report.json'); if(r.length!==2 || !r.every(x=>x.saveLoad && x.allScreens && x.pageErrors.length===0)) process.exit(1)"
       - name: Commit verified static runtime on isolated game branch
         id: publish
         run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add alien-invader/app.js alien-invader/style.css alien-invader/engine.js alien-invader/globe.js
@@ -60,7 +73,10 @@ jobs:
           QA_DIR: qa-results/live
           LIVE: '1'
           PLAY_URL: https://rawcdn.githack.com/Michaelwmdegroot/First/${{ steps.publish.outputs.revision }}/alien-invader/index.html
-        run: node alien-invader/tests/browser.mjs | tee qa-results/live.txt
+        run: |
+          set -euo pipefail
+          node alien-invader/tests/browser.mjs | tee qa-results/live.txt
+          test -s qa-results/live/report.json
       - name: Upload acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
