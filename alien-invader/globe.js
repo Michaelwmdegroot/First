@@ -37,11 +37,11 @@ export class Globe{
  color(f){const c=this.game?.country(f.id);if(this.selected===f.id)return '#f3d693';if(f.id==='010'||f.id==='304')return '#e2eddf';if(!c)return new THREE.Color(BLOCS[f.bloc].color).lerp(new THREE.Color('#a7ce9e'),.45).getStyle();
   const gradient=(a,b,t)=>new THREE.Color(a).lerp(new THREE.Color(b),clamp(t,0,1)).getStyle();
   if(this.layer==='sensors')return gradient('#c9dbc0','#df9688',this.game.sensor(c)/100);
-  if(this.layer==='exposure')return gradient('#b8d8b7','#ed9d84',(c.suspicion+c.knowledge*.5)/130);
+  if(this.layer==='exposure')return gradient('#b8d8b7','#ed9d84',(c.suspicion+(c.insight>=75?c.knowledge:0)*.5)/130);
   if(this.layer==='intelligence')return gradient('#d9dece','#76b5ae',c.insight/100);
   if(this.layer==='resources')return c.surveyed?'#c9c886':'#a7c9b0';
   if(this.layer==='economy')return this.game.s.fronts.some(x=>x.country===f.id)?'#e8c37f':this.game.legal(f.id)?'#b8d399':'#a6c6b1';
-  if(this.layer==='technology')return gradient('#c5d8b7','#aaa0ce',c.research/100);
+  if(this.layer==='technology')return gradient('#c5d8b7','#aaa0ce',(c.insight>=60?c.research:0)/100);
   if(this.layer==='network')return this.game.regions().includes(c.bloc)?'#99cbb3':'#ccd5bb';
   if(this.game.treaty(c.id))return '#8dccae';if(c.hostility>60)return '#dda294';return new THREE.Color(BLOCS[f.bloc].color).lerp(new THREE.Color('#accc9e'),.35).getStyle();
  }
