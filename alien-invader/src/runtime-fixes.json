@@ -1,0 +1,27 @@
+[
+  {
+    "file": "engine.js",
+    "before": " cancelJob(id){const j=this.s.jobs.find(j=>j.id===id);if(!j)return this.result(false,'This task has already finished');for(const[k,v]of Object.entries(j.cost||{}))this.gain({[k]:v*(j.kind==='op'?.25:.5)});const a=this.s.craft.find(a=>a.id===j.asset);if(a)a.busy=null;this.s.jobs=this.s.jobs.filter(x=>x.id!==id);return this.result(true,'Task canceled. Recoverable resources returned.');}\n",
+    "after": " cancelJob(id){const j=this.s.jobs.find(j=>j.id===id);if(!j)return this.result(false,'This task has already finished');for(const[k,v]of Object.entries(j.cost||{}))this.gain({[k]:v*(j.kind==='op'?.25:.5)});const a=this.s.craft.find(a=>a.id===j.asset);if(a)a.busy=null;const agent=this.s.agents.find(x=>x.id===j.agent);if(agent)agent.busy=null;this.s.jobs=this.s.jobs.filter(x=>x.id!==id);return this.result(true,'Task canceled. Recoverable resources returned.');}\n"
+  },
+  {
+    "file": "engine.js",
+    "before": " eventView(){const e=this.s.eventQueue[0];if(!e)return null;let d=EVENTS[e.id],c=this.country(e.context.country);let title=d.title,body=d.body;if(e.context.echo&&d.echo){title=d.echo.title;body=d.echo.body;}return {...d,...e,title,body:body.replaceAll('{country}',c?.name||'the region'),choices:d.choices.map(ch=>{const cost=ch.cost||{},blocked=[...this.shortages(cost)];if(ch.requires==='recovery'&&!this.s.craft.some(a=>a.type==='recovery'||a.type==='platform'))blocked.push('No recovery-capable craft');if(ch.requires==='contact'&&(c?.contact||0)<2)blocked.push('Requires a backchannel');return {...ch,blocked};})};}\n",
+    "after": " eventView(){\n  const e=this.s.eventQueue[0];if(!e)return null;\n  const d=EVENTS[e.id],c=this.country(e.context.country);let title=d.title,body=d.body;\n  if(e.context.echo&&d.echo){title=d.echo.title;body=d.echo.body;}\n  const choices=d.choices.map(ch=>{const cost=ch.cost||{},blocked=[...this.shortages(cost)];\n   if(ch.requires==='recovery'&&!this.s.craft.some(a=>a.type==='recovery'||a.type==='platform'))blocked.push('No recovery-capable craft');\n   if(ch.requires==='contact'&&(c?.contact||0)<2)blocked.push('Requires a backchannel');return {...ch,blocked};});\n  // A mandatory paused event must never require currency the player cannot obtain while paused.\n  // Declining intervention is costly in world-state consequences, but never resource-gated.\n  if(!choices.some(ch=>!ch.blocked.length))choices.push({id:'stand_down',label:'Accept the consequences',text:'The Network cannot fund an intervention. Let this incident run its course; public scrutiny and local suspicion rise.',cost:{},effects:{belief:5,evidence:3,coherence:4,suspicion:6,pattern:3},blocked:[]});\n  return {...d,...e,title,body:body.replaceAll('{country}',c?.name||'the region'),choices};\n }\n"
+  },
+  {
+    "file": "engine.js",
+    "before": "  if(j.kind==='project'){s.projectReady=j.subtype;if(this.projectConditions(j.subtype).every(c=>c.ok))this.finalize();else this.raise('final_conditions');}\n",
+    "after": "  if(j.kind==='project'){s.projectReady=j.subtype;s.speed=0;this.notice('Final project ready. Choose your future in the Future panel.');if(!this.projectConditions(j.subtype).every(c=>c.ok))this.raise('final_conditions');}\n"
+  },
+  {
+    "file": "globe.js",
+    "before": "  if(this.layer==='exposure')return gradient('#b8d8b7','#ed9d84',(c.suspicion+c.knowledge*.5)/130);\n",
+    "after": "  if(this.layer==='exposure')return gradient('#b8d8b7','#ed9d84',(c.suspicion+(c.insight>=75?c.knowledge:0)*.5)/130);\n"
+  },
+  {
+    "file": "globe.js",
+    "before": "  if(this.layer==='technology')return gradient('#c5d8b7','#aaa0ce',c.research/100);\n",
+    "after": "  if(this.layer==='technology')return gradient('#c5d8b7','#aaa0ce',(c.insight>=60?c.research:0)/100);\n"
+  }
+]
