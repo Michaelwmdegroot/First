@@ -16,9 +16,10 @@ for(const name of browsers){
  const target=url+(url.includes('?')?'&':'?')+'test=1';
  await page.goto(target,{waitUntil:'domcontentloaded',timeout:90000});
  if(!await page.locator('#new-game-button').count()){
-  // raw.githack may require a normal first-visit confirmation for HTML repositories.
-  const confirm=page.locator('a,button,input[type=submit]').filter({hasText:/continue|proceed|view|visit/i}).first();
-  if(await confirm.count())await confirm.click();
+  // The host's visible first-visit notice is accepted through its normal page button.
+  // This is a content notice, not a CAPTCHA; no hidden endpoint or protection is bypassed.
+  const openPage=page.getByRole('button',{name:'Open the page',exact:true});
+  if(await openPage.count()){await openPage.click();await page.waitForLoadState('domcontentloaded');}
  }
  await page.waitForFunction(()=>window.__AIS_READY__===true,{},{timeout:90000});
  await page.waitForTimeout(1700);
