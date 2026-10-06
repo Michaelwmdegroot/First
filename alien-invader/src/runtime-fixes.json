@@ -23,5 +23,10 @@
     "file": "globe.js",
     "before": "  if(this.layer==='technology')return gradient('#c5d8b7','#aaa0ce',c.research/100);\n",
     "after": "  if(this.layer==='technology')return gradient('#c5d8b7','#aaa0ce',(c.insight>=60?c.research:0)/100);\n"
+  },
+  {
+    "file": "globe.js",
+    "before": "this.renderer.setSize(w,h,false);}",
+    "after": "this.renderer.setSize(w,h,false);this.renderer.render(this.scene,this.camera);}"
   }
 ]
